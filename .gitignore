@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Data (raw data files are large — store them locally, not in Git)
+data/raw/*.h5ad
+data/raw/*.h5
+data/raw/*.loom
+data/raw/*.csv
+data/raw/*.tsv
+data/raw/*.gz
+data/processed/*.h5ad
+
+# Results (generated files — reproducible from code)
+results/figures/*.png
+results/figures/*.pdf
+results/tables/*.csv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
