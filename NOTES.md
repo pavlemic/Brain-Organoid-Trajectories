@@ -52,9 +52,9 @@ Three-phase plan:
 
 ### What we did
 - Initialized git repo (`git init`, branch renamed to `main`)
-- Configured global git identity (Pavle Micic, micicpavle051@gmail.com)
+- Configured global git identity
 - Created GitHub repo: https://github.com/pavlemic/Brain-Organoid-Trajectories
-- Authenticated with a Personal Access Token (PAT) embedded in remote URL
+- Authenticated with a Personal Access Token (PAT)
 - Executed Day 1 push: skeleton only (`.gitignore`, `README.md`, `requirements.txt`, `src/__init__.py`, `.gitkeep` files)
 - Commit: `init: project skeleton and directory structure`
 
