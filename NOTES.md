@@ -152,6 +152,33 @@ Three-phase plan:
   2. Temporal alignment — at which gestational stage and cell type do organoid trajectories diverge?
   3. Methods — adding scVelo (RNA velocity) which Bhaduri 2020 lacked
 
+### Loading the data — iterative fixes (all in colab_00_data_download.ipynb)
+
+Three attempts to load `GSE132672_allorganoids_withnew_matrix.txt.gz`, each hitting a different problem:
+
+**Attempt 1 — Dense pandas load (pd.read_csv):**
+- Crashed Colab immediately. Loading a dense matrix of ~166k cells × ~30k genes as float64 requires ~40 GB RAM. Colab has 12–25 GB.
+- Fix: switch to sparse loading.
+
+**Attempt 2 — Line-by-line sparse loader (np.array per line):**
+- Solved RAM crash but still slow. Creating `np.array(parts[1:])` for every gene row allocates a full dense array of 166k floats before filtering non-zeros. Crashed again at 5,000 genes.
+- Fix: switch to chunked pandas reading.
+
+**Attempt 3 — Chunked pandas (pd.read_csv with chunksize=200):**
+- Solved RAM crash but extremely slow — 2,000 genes processed in ~1.5 hours. Chunked pandas has high DataFrame overhead per chunk for 166k-wide matrices (200 × 166k string-to-float conversions per chunk, plus DataFrame construction).
+- Fix: replace with np.fromstring.
+
+**Attempt 4 (current, untested) — np.fromstring line-by-line with 64 MB buffer:**
+- Reads one gene row at a time, parses with `np.fromstring(line, sep='\t')` which is ~10× faster than pandas for raw numeric strings. 64 MB gzip read buffer reduces decompression overhead. Stores only non-zeros immediately.
+- Commit: `5f51acd`
+- If still too slow: fallback plan is `!zcat file.gz > /tmp/matrix.txt` to decompress to Colab disk first, then read uncompressed (eliminates gzip overhead entirely).
+
+### Downloads completed
+- Bhaduri 2020: `GSE132672_allorganoids_withnew_matrix.txt.gz` — 1,578 MB ✓ (on Drive)
+- Zhong 2018: `GSE104276_RAW.tar`, `GSE104276_all_pfc_2394_UMI_count_NOERCC.xls.gz`, `GSE104276_all_pfc_2394_UMI_TPM_NOERCC.xls.gz`, `GSE104276_readme_sample_barcode.xlsx` — 88 MB total ✓ (on Drive)
+- For Zhong: use `*_UMI_count_NOERCC.xls.gz` (raw counts), NOT the TPM file
+
 ### Next session
-- Run colab_00_data_download.ipynb with correct accessions (GSE132672 + GSE104276)
-- Begin colab_01_preprocessing.ipynb for QC on both datasets
+- Run cell 7 of colab_00_data_download.ipynb with the np.fromstring parser (commit `5f51acd`)
+- If still slow: decompress Bhaduri file to /tmp first with !zcat, then read uncompressed
+- Once both datasets loaded and saved as h5ad, begin colab_01_preprocessing.ipynb
