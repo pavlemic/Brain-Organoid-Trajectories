@@ -107,8 +107,7 @@ Three-phase plan:
 ## 2026-03-20 — Session 3 (mini push)
 
 ### What we did
-- No actual work on the project today — time constraints
-- Executed Day 2 push anyway to keep the GitHub contribution streak green:
+- Small push today:
   - `git add src/utils.py`
   - Commit: `day 2: add src/utils.py — path helpers, data loading, saving utilities`
   - Pushed to https://github.com/pavlemic/Brain-Organoid-Trajectories
@@ -182,3 +181,16 @@ Three attempts to load `GSE132672_allorganoids_withnew_matrix.txt.gz`, each hitt
 - Run cell 7 of colab_00_data_download.ipynb with the np.fromstring parser (commit `5f51acd`)
 - If still slow: decompress Bhaduri file to /tmp first with !zcat, then read uncompressed
 - Once both datasets loaded and saved as h5ad, begin colab_01_preprocessing.ipynb
+
+---
+
+## 2026-03-22 — Session 5 (mini push)
+
+### What we did
+- Small push today:
+  - `git add src/visualization.py`
+  - Commit: `day 4: add src/visualization.py — QC plots, UMAP, scree plot, auto-save to results/figures/`
+  - Pushed to https://github.com/pavlemic/Brain-Organoid-Trajectories
+
+### Next session
+- Day 5 push: notebook 01 after clean run, or run Colab cell 7 (np.fromstring loader on Bhaduri file)
