@@ -194,3 +194,15 @@ Three attempts to load `GSE132672_allorganoids_withnew_matrix.txt.gz`, each hitt
 
 ### Next session
 - Day 5 push: notebook 01 after clean run, or run Colab cell 7 (np.fromstring loader on Bhaduri file)
+
+---
+
+## 2026-03-23 — Session 6 (mini push)
+
+### What we did
+- Day 5 push executed: `notebooks/01_preprocessing.ipynb` committed and pushed (commit `8615f57`)
+  - Notebook was already clean (no cell outputs to clear)
+
+### Next session
+- Day 6 push: `notebooks/02_umap_clustering.ipynb` (clear outputs if any, then push)
+- Or: run Colab cell 7 (np.fromstring loader on Bhaduri file) — still untested
