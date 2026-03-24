@@ -206,3 +206,69 @@ Three attempts to load `GSE132672_allorganoids_withnew_matrix.txt.gz`, each hitt
 ### Next session
 - Day 6 push: `notebooks/02_umap_clustering.ipynb` (clear outputs if any, then push)
 - Or: run Colab cell 7 (np.fromstring loader on Bhaduri file) — still untested
+
+---
+
+## 2026-03-24 — Session 7
+
+### What we did
+
+#### colab_00_data_download.ipynb — loaded both datasets for the first time
+
+Three bugs fixed during loading:
+1. `gzip.open()` does not accept a `buffering` keyword — replaced with `io.TextIOWrapper(io.BufferedReader(gzip.open(..., 'rb'), buffer_size=...))` for buffered gzip reading
+2. Python lists accumulating sparse matrix values were consuming ~7× too much RAM (28 bytes/value as Python objects vs 4 bytes as C primitives) — replaced with `array.array('f')` and `array.array('i')`, cutting memory usage ~7×
+3. Missing `import pandas as pd` in the Zhong loading cell
+
+Both datasets successfully loaded and saved as h5ad to Google Drive:
+- **Bhaduri 2020** (organoids): 242,350 cells × 16,774 genes
+  - Slightly more than the 235,121 cells reported in the paper — extra cells from additional organoids added to GEO after publication ("withnew" in filename)
+  - Saved: `bhaduri_2020_raw.h5ad` — 2.6 GB ✓
+- **Zhong 2018** (fetal PFC): 2,394 cells × 24,153 genes
+  - Loaded as tab-separated text despite `.xls` extension
+  - Saved: `zhong_2018_raw.h5ad` — 464 MB ✓
+
+Notes:
+- Gene counts differ (16,774 vs 24,153) — intersection of shared genes needed at integration stage
+- GPU runtime not needed for data loading — all CPU/RAM bound
+- Colab RAM is independent of local laptop RAM
+
+#### colab_01_preprocessing.ipynb — wrote and ran full preprocessing notebook
+
+Structure (8 sections):
+1. Mount Drive + load both h5ad files
+2. QC — Bhaduri (calculate metrics, plot, filter)
+3. QC — Zhong (same)
+4. Normalize + log-transform both
+5. HVG selection — both independently
+6. PCA — both
+7. Save preprocessed objects as h5ad
+
+Key design decisions:
+- `adata.raw` saved before normalization — needed for RNA velocity later
+- Thresholds as variables at top of filter cell — easy to adjust after looking at plots
+- Notebook is interactive at QC step: plot → inspect → adjust thresholds → filter → continue
+
+**Bhaduri QC results:**
+- Distribution: main population 500–4,000 genes, sparse tail up to 8,000–10,000 (doublets). MT% mostly below 10%, tail to ~30%. No sharp valley in histogram — smooth decreasing tail, typical of pre-curated data.
+- Thresholds chosen: MIN_GENES=200, MAX_GENES=5000, MAX_MT_PCT=20
+- After filtering: only 573 cells removed (0.2%), 0 genes removed — data was already clean/pre-filtered by authors before GEO deposit
+
+**Zhong QC results:**
+- Distribution: bell-shaped centered around 3,000–4,000 genes, no empty droplet shoulder or doublet tail — heavily curated dataset. MT% = 0 for all cells (MT genes likely removed before GEO deposit or different naming convention). Counts in millions (deep sequencing per cell).
+- Thresholds chosen: MIN_GENES=500, MAX_GENES=10000, MAX_MT_PCT=20
+- After filtering: 64 cells removed (2.7%), genes dropped from 24,153 to 20,128 (unexpressed after filtering)
+
+**HVG selection (2,000 HVGs per dataset, Seurat method, independent):**
+- Bhaduri: HVGs sit cleanly above the grey cloud in normalized dispersion space, spanning a good range of expression levels
+- Zhong: same pattern, normalized dispersion values reach slightly higher (~7.5 vs ~5) — expected for smaller dataset where individual high-variance genes stand out more
+
+**PCA elbow plots:**
+- Bhaduri: gradual bend around PC 15–20, no sharp second elbow — typical for complex dataset with many cell types and 3 organoid protocols → **30 PCs chosen**
+- Zhong: steep drop through PC 8–9, clear flattening around PC 20 — sharper elbow expected for smaller, cleaner dataset → **20 PCs chosen**
+
+Both preprocessed objects saved to Google Drive as h5ad.
+
+### Next session
+- Day 6 push: `notebooks/02_umap_clustering.ipynb` (clear outputs if any, then push)
+- Write `notebooks/colab/colab_02_umap_clustering.ipynb` — neighbor graph, UMAP, Leiden clustering using 30 PCs (Bhaduri) and 20 PCs (Zhong)
