@@ -272,3 +272,75 @@ Both preprocessed objects saved to Google Drive as h5ad.
 ### Next session
 - Day 6 push: `notebooks/02_umap_clustering.ipynb` (clear outputs if any, then push)
 - Write `notebooks/colab/colab_02_umap_clustering.ipynb` — neighbor graph, UMAP, Leiden clustering using 30 PCs (Bhaduri) and 20 PCs (Zhong)
+
+---
+
+## 2026-03-25 — Session 8
+
+### What we did
+
+#### colab_02_umap_clustering.ipynb — written, run, annotated
+
+**Notebook written and pushed (commit ab85c65).** Structure: neighbor graph → UMAP → Leiden clustering → visualization → marker genes → save, for both datasets independently.
+
+**Bugs fixed during Colab run:**
+1. Dense X RAM issue — preprocessed h5ad stores a dense scaled X (~16 GB for Bhaduri) that exceeded the 12.7 GB standard RAM limit. Fix: switched to High-RAM runtime (51 GB) and added a cell to replace dense X with sparse raw counts from `adata.raw` immediately after loading (~25 GB freed)
+2. Barcode extraction wrong direction — `str.rsplit('_', n=1).str[-1]` extracted the 16-character cell barcode (204,769 unique values) instead of the sample prefix. Fix: `str.split('_', n=1).str[0]` extracts the prefix (e.g. `H1SWeek3`), giving 37 unique sample IDs encoding cell line, protocol, and timepoint
+3. `leidenalg` not installed — added to pip install cell
+4. `rank_genes_groups` warning about raw counts — added log-normalize cells before marker gene detection for both datasets
+5. Print indentation bug in text marker gene cell — `print` was outside the `for` loop, only printed last cluster
+
+**Bhaduri 2020 results — 18 clusters at resolution 0.5:**
+
+| Cluster | Key markers | Cell type |
+|---------|-------------|-----------|
+| 0 | VIM, SOX2, MDK, CRABP1 | Radial glia (ventricular) |
+| 1 | STMN2, NEFL, NEFM, GAP43 | Mature neurons |
+| 2 | NEUROD6, SNAP25, VAMP2, RTN1 | Excitatory neurons (mature, synaptic) |
+| 3 | ID4, FABP7, IGFBP2 | Outer radial glia (oRG) |
+| 4 | Ribosomal genes, H3F3A, POLR2L | Cycling progenitors |
+| 5 | EMX2, HES1, WLS, RSPO3 | Cortical progenitors (EMX2+) |
+| 6 | VIM, IGFBP2, MIF, ANXA2 | Stressed radial glia |
+| 7 | HMGB1, H2AFZ, PTMA, EMX2 | Cycling cortical progenitors |
+| 8 | NEUROD2, NEUROD6, MEF2C, SOX4 | Excitatory neurons (early) |
+| 9 | TTR, CA2, CST3, APOE | Choroid plexus (off-target) |
+| 10 | TCF7L2, GAP43, NEFL, TTR | Mixed neuronal / choroid plexus |
+| 11 | DCX, MEIS2, TAC1, SOX4 | Immature/migrating neurons |
+| 12 | DLX1, DLX2, DLX5, GAD2 | GABAergic interneurons |
+| 13 | FTH1, PTN, HSPB1, HES4 | Stressed progenitors |
+| 14 | FABP7, CLU, CRYAB, DBI | Astrocyte progenitors |
+| 15 | NEUROD2, NEUROD6, BCL11A, HMGCS1 | Excitatory neurons (mature) |
+| 16 | GABARAP, EEF1G, ACTB | Unclear — possibly stressed/dying |
+| 17 | ID4, FABP7, PTPRZ1, VIM | Outer radial glia (oRG) |
+
+Key observations: progenitor-dominated, stress clusters (6, 13, 16), choroid plexus off-target (9, 10), two oRG clusters (3, 17), three excitatory neuron clusters (2, 8, 15), EOMES and TBR1 nearly absent (poor intermediate progenitor and neuronal subtype specification — consistent with Bhaduri 2020).
+
+**Zhong 2018 results — 11 clusters at resolution 0.5:**
+
+| Cluster | Key markers | Cell type |
+|---------|-------------|-----------|
+| 0 | ENC1, RTN1, MEIS2, SEMA3C | Immature/migrating neurons |
+| 1 | GAD1, DLX2, DLX5, LHX6, CXCR4 | GABAergic interneurons (MGE-derived) |
+| 2 | MEF2C, CAMK2B, ADCY1, NECAB1 | Excitatory neurons (mature) |
+| 3 | SATB2, NEUROD2, SOX11, AUTS2 | Excitatory neurons (upper layer, SATB2+) |
+| 4 | HMGB2, TOP2A, UBE2C, NUSAP1 | Cycling progenitors (G2/M) |
+| 5 | NEUROD6, NEUROD1, CNTNAP2, NFIB | Excitatory neurons (NEUROD1/6+) |
+| 6 | HOPX, SLC1A3, CLU, BCAN, PTN | Outer radial glia (HOPX+) |
+| 7 | DLX1, DLX2, DLX5, CALB2, SCGN | GABAergic interneurons (CGE-derived) |
+| 8 | AIF1, CX3CR1, TYROBP, LAPTM5 | Microglia |
+| 9 | PDGFRA, OLIG1, SOX10, S100B | Oligodendrocyte precursors (OPCs) |
+| 10 | HBB, HBA1, HBA2, ALAS2, GYPB | Red blood cells (contamination) |
+
+Key observations: two interneuron subtypes (MGE cluster 1 vs CGE cluster 7), SATB2+ upper layer neurons, microglia (absent in Bhaduri), OPCs, EOMES and TBR1 detectable (better neuronal specification than organoids), HOPX+ oRG, no stress clusters, no choroid plexus, RBC contamination in cluster 10 — **must be removed before integration**.
+
+**Gestational week distribution (Zhong):** GW8 (23), GW9 (88), GW10 (188), GW12 (86), GW13 (24), GW16 (767), GW19 (120), GW23 (314), GW26 (720). UMAP shows clear temporal gradient — early GW in upper-left, late GW in lower region. Confirms dataset captures genuine developmental progression.
+
+**Both clustered objects saved to Drive:**
+- `bhaduri_2020_clustered.h5ad`
+- `zhong_2018_clustered.h5ad`
+
+**Inline comments added to all three colab notebooks** and pushed to GitHub.
+
+### Next session
+- Write `colab_03_integration.ipynb` — Harmony or scVI
+- Before integration: remove RBC cluster (Zhong cluster 10) and consider removing choroid plexus clusters (Bhaduri clusters 9, 10) and unclear cluster 16
