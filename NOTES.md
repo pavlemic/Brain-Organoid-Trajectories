@@ -344,3 +344,9 @@ Key observations: two interneuron subtypes (MGE cluster 1 vs CGE cluster 7), SAT
 ### Next session
 - Write `colab_03_integration.ipynb` — Harmony or scVI
 - Before integration: remove RBC cluster (Zhong cluster 10) and consider removing choroid plexus clusters (Bhaduri clusters 9, 10) and unclear cluster 16
+
+---
+
+## 2026-03-26 — Planning note
+
+Integration approach decision: leaning toward **Harmony** for colab_03 as first pass (fast, well-tested on multi-batch scRNA-seq, easy to swap out). scVI kept as backup if Harmony over-integrates or under-corrects. Will assess by checking whether known cell types (e.g. RG, excitatory neurons) cluster by type rather than by dataset after integration.
