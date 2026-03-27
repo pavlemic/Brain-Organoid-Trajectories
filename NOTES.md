@@ -350,3 +350,19 @@ Key observations: two interneuron subtypes (MGE cluster 1 vs CGE cluster 7), SAT
 ## 2026-03-26 — Planning note
 
 Integration approach decision: leaning toward **Harmony** for colab_03 as first pass (fast, well-tested on multi-batch scRNA-seq, easy to swap out). scVI kept as backup if Harmony over-integrates or under-corrects. Will assess by checking whether known cell types (e.g. RG, excitatory neurons) cluster by type rather than by dataset after integration.
+
+---
+
+## 2026-03-27 — Session 9 (mini push)
+
+### What we did
+- Pushed `outputs_local/` to GitHub (commit `01946f3`) — 25 files, ~27 MB total
+  - `outputs_local/colab_01_preprocessing_PLOTS/` — 10 QC, HVG, and PCA plots for both Bhaduri and Zhong
+  - `outputs_local/colab_02_umap_clustering_PLOTS/` — 12 UMAP, marker gene, and dot plots for both datasets
+  - `outputs_local/colab_00_data_download_WITH_OUTPUT.ipynb` — executed notebook copy (24 KB)
+  - `outputs_local/colab_01_preprocessing_WITH_OUTPUT.ipynb` — executed notebook copy (1.6 MB)
+  - `outputs_local/colab_02_umap_clustering_WITH_OUTPUT.ipynb` — executed notebook copy (14 MB, large due to embedded UMAP plots)
+
+### Next session
+- Write `colab_03_integration.ipynb` — Harmony as first pass
+- Pre-integration cleanup: remove Zhong cluster 10 (RBC), consider removing Bhaduri clusters 9, 10 (choroid plexus) and cluster 16 (unclear)
