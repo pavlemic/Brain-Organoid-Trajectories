@@ -353,6 +353,43 @@ Integration approach decision: leaning toward **Harmony** for colab_03 as first 
 
 ---
 
+## 2026-04-01 — Session 10
+
+### What we did
+- Wrote `notebooks/colab/colab_03_integration.ipynb` — full Harmony integration notebook
+
+**Notebook structure (15 sections):**
+1. Setup (mount, install scanpy + leidenalg + harmonypy, paths)
+2. Load clustered h5ads from Drive
+3. Free RAM — replace log-normalized X with raw counts from adata.raw (same fix as colab_02)
+4. Add cell type annotations — maps leiden IDs → cell_type labels for both datasets (from colab_02 analysis)
+5. Remove off-target clusters: Bhaduri 9/10 (choroid plexus), 16 (unclear); Zhong 10 (RBC). **Stress clusters 6/13 kept.**
+6. Gene intersection — subset both to shared genes (~16k)
+7. Concatenate with `anndata.concat`, `label='dataset'`, obs_names prefixed ('bhaduri_' / 'zhong_')
+8. Normalize + log1p on combined object
+9. Save `adata.raw = adata` (log-normalized all genes — for use_raw=True plots and RNA velocity)
+10. Joint HVG selection: 2000 HVGs, `batch_key='dataset'`, `flavor='seurat'`
+11. Subset to HVGs + scale (max_value=10)
+12. PCA (30 PCs)
+13. Unintegrated UMAP — stored in `obsm['X_umap_unintegrated']` for before/after comparison
+14. Harmony (`sc.external.pp.harmony_integrate`, theta=2) → Harmony neighbors → integrated UMAP
+15. Leiden clustering → visualizations (by dataset, cell type, cluster composition, temporal, markers) → save
+
+**Key design decisions:**
+- Stress clusters kept intentionally — they are the central biological finding (Bhaduri 2020)
+- `batch_key='dataset'` in HVG selection ensures genes variable within each dataset, not just between
+- Pre-Harmony UMAP stored separately (`X_umap_unintegrated`) for quality comparison
+- `adata.raw` saved after log-normalization but before HVG subsetting — enables all-gene plots with `use_raw=True`
+- Harmony theta=2 default; notebook includes guidance to adjust if under/overcorrected
+
+### Next session
+- Push colab_03 to GitHub
+- Run colab_03 in Colab, inspect integration quality
+- If Harmony looks good → write colab_04 (cell type annotation in integrated space)
+- If under/overcorrected → adjust theta or fall back to scVI
+
+---
+
 ## 2026-03-28 — Planning note
 
 Pre-integration checklist before writing colab_03:
