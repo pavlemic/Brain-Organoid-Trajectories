@@ -353,6 +353,54 @@ Integration approach decision: leaning toward **Harmony** for colab_03 as first 
 
 ---
 
+## 2026-03-27 — Session 9 (mini push)
+
+### What we did
+- Pushed `outputs_local/` to GitHub (commit `01946f3`) — 25 files, ~27 MB total
+  - `outputs_local/colab_01_preprocessing_PLOTS/` — 10 QC, HVG, and PCA plots for both Bhaduri and Zhong
+  - `outputs_local/colab_02_umap_clustering_PLOTS/` — 12 UMAP, marker gene, and dot plots for both datasets
+  - `outputs_local/colab_00_data_download_WITH_OUTPUT.ipynb` — executed notebook copy (24 KB)
+  - `outputs_local/colab_01_preprocessing_WITH_OUTPUT.ipynb` — executed notebook copy (1.6 MB)
+  - `outputs_local/colab_02_umap_clustering_WITH_OUTPUT.ipynb` — executed notebook copy (14 MB, large due to embedded UMAP plots)
+
+### Next session
+- Write `colab_03_integration.ipynb` — Harmony as first pass
+- Pre-integration cleanup: remove Zhong cluster 10 (RBC), consider removing Bhaduri clusters 9, 10 (choroid plexus) and cluster 16 (unclear)
+
+---
+
+## 2026-03-28 — Planning note
+
+Pre-integration checklist before writing colab_03:
+
+**Cells to remove before integration:**
+- Zhong cluster 10 (RBC contamination — HBB, HBA1, HBA2, ALAS2, GYPB) — definite remove
+- Bhaduri cluster 9 (choroid plexus — TTR, CA2, CST3, APOE) — definite remove (off-target organoid differentiation)
+- Bhaduri cluster 10 (mixed neuronal/choroid plexus) — definite remove (same off-target issue)
+- Bhaduri cluster 16 (unclear — GABARAP, EEF1G, ACTB) — remove (stressed/dying cells, no informative biology)
+
+**Integration plan:**
+- Method: Harmony (first pass) — fast, well-established for multi-batch scRNA-seq
+- Input: intersection of shared genes between Bhaduri (16,774) and Zhong (20,128 post-QC) — gene intersection step happens in colab_03 before integration
+- Batch key: `dataset` column (values: `bhaduri` vs `zhong`)
+- Post-integration UMAP: check that same cell types cluster together across datasets (RG with RG, neurons with neurons) but datasets don't fully collapse (we want to see genuine organoid vs fetal divergence)
+- If Harmony over-integrates (datasets fully merge, no biological signal retained): fall back to scVI
+- If Harmony under-corrects (datasets still fully separate on UMAP): increase `theta` parameter (default 2)
+
+**colab_03 notebook structure (planned):**
+1. Mount Drive + load clustered h5ads
+2. Remove off-target cells (RBC + choroid plexus + unclear clusters)
+3. Find gene intersection — subset both datasets to shared genes
+4. Concatenate into single AnnData — add `dataset` column as batch key
+5. Normalize + HVG selection on combined object (top 2,000 HVGs from shared genes)
+6. PCA on combined (use ~30 PCs — conservative for two-dataset integration)
+7. Run Harmony (`sc.external.pp.harmony_integrate`)
+8. UMAP on Harmony embedding
+9. Leiden clustering on integrated object
+10. Save integrated object as h5ad
+
+---
+
 ## 2026-04-01 — Session 10
 
 ### What we did
@@ -440,51 +488,3 @@ Converged at iteration 33. Fix applied permanently in the notebook.
   - Reannotate 19 integrated Leiden clusters
   - Re-add `gestational_week` (Zhong) and `sample` (Bhaduri) columns
   - Thorough marker gene analysis in integrated space
-
----
-
-## 2026-03-28 — Planning note
-
-Pre-integration checklist before writing colab_03:
-
-**Cells to remove before integration:**
-- Zhong cluster 10 (RBC contamination — HBB, HBA1, HBA2, ALAS2, GYPB) — definite remove
-- Bhaduri cluster 9 (choroid plexus — TTR, CA2, CST3, APOE) — definite remove (off-target organoid differentiation)
-- Bhaduri cluster 10 (mixed neuronal/choroid plexus) — definite remove (same off-target issue)
-- Bhaduri cluster 16 (unclear — GABARAP, EEF1G, ACTB) — remove (stressed/dying cells, no informative biology)
-
-**Integration plan:**
-- Method: Harmony (first pass) — fast, well-established for multi-batch scRNA-seq
-- Input: intersection of shared genes between Bhaduri (16,774) and Zhong (20,128 post-QC) — gene intersection step happens in colab_03 before integration
-- Batch key: `dataset` column (values: `bhaduri` vs `zhong`)
-- Post-integration UMAP: check that same cell types cluster together across datasets (RG with RG, neurons with neurons) but datasets don't fully collapse (we want to see genuine organoid vs fetal divergence)
-- If Harmony over-integrates (datasets fully merge, no biological signal retained): fall back to scVI
-- If Harmony under-corrects (datasets still fully separate on UMAP): increase `theta` parameter (default 2)
-
-**colab_03 notebook structure (planned):**
-1. Mount Drive + load clustered h5ads
-2. Remove off-target cells (RBC + choroid plexus + unclear clusters)
-3. Find gene intersection — subset both datasets to shared genes
-4. Concatenate into single AnnData — add `dataset` column as batch key
-5. Normalize + HVG selection on combined object (top 2,000 HVGs from shared genes)
-6. PCA on combined (use ~30 PCs — conservative for two-dataset integration)
-7. Run Harmony (`sc.external.pp.harmony_integrate`)
-8. UMAP on Harmony embedding
-9. Leiden clustering on integrated object
-10. Save integrated object as h5ad
-
----
-
-## 2026-03-27 — Session 9 (mini push)
-
-### What we did
-- Pushed `outputs_local/` to GitHub (commit `01946f3`) — 25 files, ~27 MB total
-  - `outputs_local/colab_01_preprocessing_PLOTS/` — 10 QC, HVG, and PCA plots for both Bhaduri and Zhong
-  - `outputs_local/colab_02_umap_clustering_PLOTS/` — 12 UMAP, marker gene, and dot plots for both datasets
-  - `outputs_local/colab_00_data_download_WITH_OUTPUT.ipynb` — executed notebook copy (24 KB)
-  - `outputs_local/colab_01_preprocessing_WITH_OUTPUT.ipynb` — executed notebook copy (1.6 MB)
-  - `outputs_local/colab_02_umap_clustering_WITH_OUTPUT.ipynb` — executed notebook copy (14 MB, large due to embedded UMAP plots)
-
-### Next session
-- Write `colab_03_integration.ipynb` — Harmony as first pass
-- Pre-integration cleanup: remove Zhong cluster 10 (RBC), consider removing Bhaduri clusters 9, 10 (choroid plexus) and cluster 16 (unclear)
