@@ -390,6 +390,59 @@ Integration approach decision: leaning toward **Harmony** for colab_03 as first 
 
 ---
 
+## 2026-04-02 — Session 11
+
+### What we did
+- Ran `colab_03_integration.ipynb` in Colab (High-RAM CPU runtime) cell by cell
+- Two bugs encountered and fixed during the run
+
+**Bug 1 — Zhong X matrix type (section 2c):**
+`adata_fetal.raw.X` was stored as a dense ndarray instead of csr_matrix. `ad.concat` with one sparse and one dense dataset would densify the entire 226k-cell combined object (~15 GB), crashing the runtime. Fixed by converting before concat:
+```python
+adata_fetal.X = sp.csr_matrix(adata_fetal.X)
+```
+Added permanently as section 2c in the notebook.
+
+**Bug 2 — Harmony shape mismatch (section 10):**
+`sc.external.pp.harmony_integrate()` threw a `ValueError` (shape `(30,)` vs expected `(226659,)`) — a version incompatibility where the scanpy wrapper incorrectly transposes the output. Additionally, `max_iter_harmony=20` was insufficient (did not converge). Fixed by calling harmonypy directly:
+```python
+ho = hm.run_harmony(adata.obsm['X_pca'], adata.obs, 'dataset', theta=2, max_iter_harmony=50)
+adata.obsm['X_pca_harmony'] = ho.Z_corr   # (226659, 30) — no transpose needed
+```
+Converged at iteration 33. Fix applied permanently in the notebook.
+
+**Results — section by section:**
+- Section 2: Bhaduri 241,776 cells × 16,774 genes; Zhong 2,330 cells × 20,128 genes
+- Section 4: Removed 17,431 Bhaduri off-target cells (7.2%: choroid plexus + unclear) and 16 Zhong RBC cells (0.7%)
+- Section 5: 14,498 shared genes (86% of Bhaduri's gene set retained)
+- Section 6: Combined object 226,659 cells × 14,498 genes
+- Section 7: 2,000 HVGs selected (batch-aware, `batch_key='dataset'`)
+- Section 8: PCA elbow — gradual continuous decline, no sharp break; 30 PCs confirmed correct
+- Section 9 (pre-Harmony UMAP): Zhong cells completely isolated from Bhaduri — strong batch effect confirmed, Harmony necessary
+- Section 10: Harmony converged at iteration 33/50; corrected PCA shape (226659, 30) ✓
+- Section 12: 19 Leiden clusters at resolution=0.5
+- Section 13 (integration quality):
+  - Post-Harmony: Zhong cells distributed across Bhaduri cloud — successful mixing for shared cell types
+  - Cell type UMAP: progenitors (top/left), neurons (bottom), stress clusters embedded in progenitor zone, microglia/OPCs isolated (Zhong-only) — biologically correct
+  - Dataset composition: clusters 5, 17, 18 = 100% Bhaduri (stress clusters); cluster 13 = 11.1% Zhong (microglia/OPCs/interneurons); all others near 99/1 baseline
+  - `gestational_week` and `sample` columns dropped by `ad.concat` — to be re-added in colab_04
+- Section 14 (markers): All 9 markers (SOX2, PAX6, EOMES, TBR1, NEUROD2, GAD1, GAD2, GFAP, MKI67) landed in expected regions — biology preserved after integration
+- Section 15: Saved `integrated_harmony.h5ad` — 7,550.8 MB on Drive
+
+**GitHub commits this session:**
+- `644fcfe` — Add section 2c (Zhong sparse fix)
+- `8a76fed` — Fix Harmony cell (harmonypy direct call)
+- `c7630c7` — Improved cell type UMAP (numbered labels + side legend)
+- `f1be34a` — Note about dataset-specific obs columns dropped during concat
+
+### Next session
+- Write `colab_04_cell_type_annotation.ipynb`
+  - Reannotate 19 integrated Leiden clusters
+  - Re-add `gestational_week` (Zhong) and `sample` (Bhaduri) columns
+  - Thorough marker gene analysis in integrated space
+
+---
+
 ## 2026-03-28 — Planning note
 
 Pre-integration checklist before writing colab_03:
