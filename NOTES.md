@@ -488,3 +488,57 @@ Converged at iteration 33. Fix applied permanently in the notebook.
   - Reannotate 19 integrated Leiden clusters
   - Re-add `gestational_week` (Zhong) and `sample` (Bhaduri) columns
   - Thorough marker gene analysis in integrated space
+
+---
+
+## 2026-04-15 — Session 12
+
+### What we did
+- Wrote `colab_04_cell_type_annotation.ipynb` (16 sections) and pushed to GitHub (`c157d40`)
+- Began running colab_04 in Colab — completed sections 1–7 so far
+
+**Sections completed:**
+- Section 1 (Setup): scanpy + leidenalg installed, paths configured
+- Section 2 (Load): Loaded `integrated_harmony.h5ad` — 226,659 cells × 2,000 HVGs (14,498 in raw)
+- Section 3 (Metadata recovery): Re-added `sample` (37 unique, all 224,345 Bhaduri cells mapped) and `gestational_week` (9 timepoints GW08–GW26, all 2,314 Zhong cells mapped) from individual clustered h5ads via backed reading + barcode prefix stripping
+- Section 4 (Orientation): Quick UMAP refresh of Leiden clusters + dataset
+- Section 5 (Marker detection): Wilcoxon rank-sum on all 14,498 genes (`use_raw=True`), top 15 genes per cluster printed with scores and p-values
+- Section 6 (Dotplot): 45-marker panel across 15 cell type categories; 42/45 available (missing: LHX6, CSF1R, CX3CR1)
+- Section 7 (Feature plots): UMAP expression maps for progenitor, neuronal, interneuron, and glial/stress markers
+
+**Marker analysis — preliminary cluster identities (to be confirmed in section 10):**
+- 0: vRG (SOX2+, PAX6+, VIM+)
+- 1: Excitatory neurons (NEUROD6+)
+- 2: Immature neurons / mature (STMN2+, NEFL+, GAP43+)
+- 3: Cycling progenitors G2/M (TOP2A+, MKI67+, UBE2C+)
+- 4: Immature neurons early (TAGLN3+, transitional)
+- 5: Cortical progenitors EMX2+ (HES1+, RSPO2/3+)
+- 6: Cycling progenitors S-phase (HIST1H4C+, TUBA1B+)
+- 7: Progenitors — high ribosomal (RPL/RPS genes dominant)
+- 8: Progenitors — chromatin-active (H2AFZ+, HMGN2+, ID4+)
+- 9: oRG (HOPX+, FAM107A+, FABP7+, PTN+)
+- 10: Excitatory neurons mature (NEUROD2+, NEUROD6+, TBR1+, BCL11B+, SATB2+, RAB3A+)
+- 11: Immature neurons migrating (DCX+, SOX4+, MEIS2+)
+- 12: Astrocyte progenitors / oRG (TTR+, CLU+, PCP4+ — unclear, needs confirmation)
+- 13: GABAergic interneurons MGE (DLX1/2/5+, GAD1/2+, SST+, 11.1% Zhong)
+- 14: Excitatory neurons maturing — lipid-active (NEUROD2/6+, HMGCS1+, SQLE+, INSIG1+)
+- 15: oRG / astrocyte progenitors (HOPX+, GFAP+, CRYAB+)
+- 16: Stressed cells (FOS+, HSPA1A+, KRT10+, organoid-specific)
+- 17: Immature neurons — high ribosomal (MEF2C+, RPL/RPS genes)
+- 18: Stressed progenitors (HSPB1+, HSPA1A+, HES1+, organoid-specific)
+
+**Key biological observations from feature plots:**
+- Progenitor hierarchy visible on UMAP: vRG (SOX2+PAX6+) → oRG (HOPX+) → neurons
+- EOMES very sparse — confirms poor IP specification in organoids (Bhaduri 2020 finding)
+- Clear neuronal maturation gradient: DCX+/STMN2+ (immature) → NEUROD2+/BCL11B+ (mature)
+- Interneurons almost entirely MGE-lineage (DLX+/GAD+); CGE markers (VIP, CALB2) essentially absent
+- Glial maturation limited: GFAP present but AQP4 weak — astrocyte progenitors, not mature astrocytes
+- OPCs (OLIG2+, PDGFRA+) and microglia (AIF1+) on isolated island — fetal-only
+- Stress clusters (16, 18) unambiguously marked by FOS + HSPA1A
+
+### Still to run (sections 8–16)
+- Section 8: Dataset composition per cluster
+- Section 9: Pre-integration cell type cross-tabulation
+- Section 10: Fill in CLUSTER_ANNOTATIONS and apply
+- Sections 11–15: Visualization, validation, organoid vs fetal composition, temporal, sample analysis
+- Section 16: Save `integrated_annotated.h5ad`
