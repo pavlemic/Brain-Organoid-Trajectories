@@ -536,9 +536,22 @@ Converged at iteration 33. Fix applied permanently in the notebook.
 - OPCs (OLIG2+, PDGFRA+) and microglia (AIF1+) on isolated island — fetal-only
 - Stress clusters (16, 18) unambiguously marked by FOS + HSPA1A
 
-### Still to run (sections 8–16)
-- Section 8: Dataset composition per cluster
-- Section 9: Pre-integration cell type cross-tabulation
-- Section 10: Fill in CLUSTER_ANNOTATIONS and apply
-- Sections 11–15: Visualization, validation, organoid vs fetal composition, temporal, sample analysis
-- Section 16: Save `integrated_annotated.h5ad`
+**Sections 8–16 (completed after break):**
+- Section 8 (Dataset composition): Clusters 5, 17, 18 = 100% Bhaduri (organoid-only). Cluster 13 = 11.1% Zhong (GABAergic — enriched fetal). Clusters 1, 8, 9, 11, 12 slightly above 1% baseline Zhong.
+- Section 9 (Cross-tabulation): Pre-integration cell types vs integrated clusters. Corrected 3 misassignments from markers alone: cluster 8 = oRG (not generic progenitors), cluster 12 = cycling progenitors (not choroid plexus — TTR was misleading), cluster 17 = astrocyte progenitors (not neuronal).
+- Section 10 (Annotation): All 19 clusters annotated → `cell_type_integrated` column. Final labels: vRG, Excitatory neurons, Mature neurons, Cycling progenitors (G2/M), Immature neurons (early), Cortical progenitors (EMX2+), Cycling progenitors (S-phase), Cycling cortical progenitors, oRG, oRG (mixed), Excitatory neurons (mature), Immature neurons (migrating), Cycling progenitors, GABAergic interneurons, Excitatory neurons (maturing), oRG / astrocyte progenitors, Stressed progenitors, Astrocyte progenitors, Stressed progenitors (mixed).
+- Section 11 (Annotated UMAP): Spatial organization biologically correct — progenitors top-left, neurons bottom-right, interneurons isolated, stress at periphery.
+- Section 12 (Validation dotplot): All labels consistent with expected marker expression — no contradictions.
+- Section 13 (Organoid vs fetal composition): Key finding — organoids are progenitor-heavy (vRG 18.7% vs 2.2% fetal), fetal is neuron-heavy (excitatory 36.3% vs 13.6%, GABAergic 25.4% vs 2.1%). Organoids stuck in progenitor-expanding mode.
+- Section 14 (Temporal — Zhong): Clear developmental progression GW08→GW26. Early = excitatory neuron dominated. GABAergic interneurons surge at GW23–26 (44–48%) — tangential migration peak. Caveat: GW08 (23 cells) and GW13 (24 cells) are noisy.
+- Section 15 (Sample — Bhaduri): 37 samples across cell lines × protocols × timepoints. Massive protocol-dependent variability — same timepoint produces completely different compositions depending on sample. Stressed progenitors concentrated in YH10PWeek8 (32.3%). Astrocyte progenitors in L13234 Week24 (34–44%). GABAergic interneurons mainly in L13234SWeek15 (55%) and Week10S (50%).
+- Section 16 (Save): `integrated_annotated.h5ad` — 7,569.3 MB on Drive. New obs: cell_type_integrated, sample, gestational_week. rank_genes_groups in uns.
+
+**GitHub commits this session:**
+- `c157d40` — Add colab_04_cell_type_annotation.ipynb
+- `0fd4dc5` — Session 12 notes (partial)
+
+### Next session
+- Push final NOTES.md update
+- `colab_05_trajectory.ipynb` — pseudotime analysis (diffusion pseudotime or Monocle3) on the annotated integrated object
+- `colab_06_rna_velocity.ipynb` — scVelo (requires spliced/unspliced count matrices)
