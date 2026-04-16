@@ -555,3 +555,97 @@ Converged at iteration 33. Fix applied permanently in the notebook.
 - Push final NOTES.md update
 - `colab_05_trajectory.ipynb` — pseudotime analysis (diffusion pseudotime or Monocle3) on the annotated integrated object
 - `colab_06_rna_velocity.ipynb` — scVelo (requires spliced/unspliced count matrices)
+
+---
+
+## 2026-04-16 — Session 13
+
+### What we did
+- Wrote `colab_05_trajectory.ipynb` — PAGA + diffusion pseudotime (15 sections, 52 cells)
+- Pushed to GitHub (commits `0e9ad1b`, `f2c5e65`, `62d126c`)
+- Started running in Colab (High-RAM runtime)
+
+**Design decision — PAGA + DPT instead of Monocle3:**
+The pipeline originally specified Monocle3 for pseudotime, but Monocle3 is an R package. Since the entire project uses Python/scanpy, we use PAGA (trajectory topology) + diffusion pseudotime (maturation ordering) — both native to scanpy, well-cited, and work directly on the Harmony-corrected neighbor graph.
+
+**Notebook structure (15 sections):**
+1. Setup (mount, install scanpy/leidenalg, paths)
+2. Load `integrated_annotated.h5ad` (226,659 cells)
+3. Verify neighbor graph (Harmony-corrected, from colab_03)
+4. PAGA — trajectory topology (19×19 connectivity matrix between cell types)
+5. PAGA-initialized UMAP (recompute UMAP seeded from PAGA positions — better trajectory layout)
+6. Diffusion map (15 components — eigendecomposition of transition matrix)
+7. Root cell selection (vRG at extreme of DC1 — most primitive progenitor)
+8. Diffusion pseudotime (geodesic distance from root on diffusion map)
+9. Pseudotime by cell type (violin plots, ordered by median)
+10. Organoid vs fetal pseudotime comparison (histograms, per-type scatter, Mann-Whitney)
+11. Pseudotime vs gestational week validation (Spearman correlation with Zhong GW)
+12. Gene expression dynamics along pseudotime (13 markers, binned mean, split by dataset)
+13. Lineage-specific analysis (excitatory + GABAergic subsets)
+14. Per-dataset pseudotime (independent DPT on Bhaduri and Zhong separately)
+15. Save as `integrated_trajectory.h5ad`
+
+**Sections completed in Colab so far:**
+- Sections 1–3: loaded, graph verified (connectivities present, k≈19)
+- Section 4 (PAGA): computed successfully. Default `sc.pl.paga` had unreadable overlapping labels — rewrote with numbered nodes + side legend (same style as previous notebooks). Added `plt.close()` to suppress ghost plot from `show=False`.
+
+**PAGA graph observations:**
+- vRG (node 1) is the central hub — connects to multiple progenitor types (correct as root)
+- Cycling progenitors (7, 8, 12) form a connected cluster
+- oRG (9, 10) connects to vRG and astrocyte progenitors (16) — glial branch
+- Excitatory neurons (2, 11, 15) connect through immature neurons — excitatory lineage
+- GABAergic interneurons (14) relatively isolated with thin connection — separate branch
+- Stressed progenitors (17, 19) at periphery with weak connections — organoid-specific
+
+**Sections not yet run:** 5–15 (PAGA UMAP, diffusion map, DPT, all comparisons, save)
+
+**RAM-intensive steps ahead:**
+- Section 6 (diffusion map): eigendecomposition on 226k cells — hardest step
+- Section 14 (Bhaduri independent DPT): ~224k cells, 10–30 min
+- Section 5 (PAGA UMAP recompute): moderate, ~5–15 min
+
+**GitHub commits this session:**
+- `0e9ad1b` — Add colab_05_trajectory.ipynb
+- `f2c5e65` — Fix PAGA graph: numbered labels with side legend
+- `62d126c` — Suppress default PAGA plot with plt.close()
+
+### Token usage issue
+Session hit 93% token usage before finishing the Colab run. Root cause: two full reads of the entire 52-cell notebook (~1,300 lines each) when editing the PAGA graph cell. **Going forward:** avoid reading the full notebook — use targeted NotebookEdit by cell ID instead of reading + editing.
+
+---
+
+## 2026-04-16 — Session 14
+
+### What we did
+- Continued colab_05 from section 5
+- Completed sections 5–6, started section 6 plots
+
+**Section 5 — PAGA-Initialized UMAP:**
+- Stored original Harmony UMAP as `X_umap_harmony`, recomputed with `init_pos='paga'`
+- Result: UMAP now has a tree-like shape — thin trunk at the bottom (progenitors), branching at the top (differentiated types). Much better trajectory layout than the original Harmony UMAP.
+- Also improved the PAGA-on-UMAP plot (cell-13): increased background cell visibility (alpha 0.03→0.08, size 0.1→0.3), node numbers (fontsize 7→10), legend (fontsize 6→8)
+
+**Section 6 — Diffusion Map:**
+- Fixed `sc.tl.diffusion_map` → `sc.tl.diffmap` (function renamed in newer scanpy). Fixed in all 3 occurrences (cells 18, 44, 46).
+- Diffusion map computed in ~30 seconds (not 5–20 min as estimated — Colab machine was fast)
+- 15 components, eigenvalues top 5: [1.0, 0.999, 0.997, 0.995, 0.994]
+
+**PROBLEM — Diffusion map captures batch effect, not biology:**
+- DC1–DC4 on UMAP (cell-19): DC1 shows almost no visible gradient — nearly uniform color across all cells. DC2–DC4 similarly weak.
+- DC1 vs DC2 scatter (cell-20): Bhaduri and Zhong cells clearly separate by dataset, not by cell type. The diffusion components are capturing dataset identity rather than developmental trajectories.
+- Root cause hypothesis: despite Harmony correcting the PCA space, the diffusion map eigendecomposition on the neighbor graph still picks up residual batch structure. The 226k Bhaduri cells dominate the graph topology.
+- This means pseudotime computed from these components would not be meaningful — it would measure "how Bhaduri-like" a cell is rather than maturation.
+
+**This needs to be solved before continuing to section 7 (root selection) and section 8 (DPT).**
+
+**GitHub commits this session:**
+- `ac827f8` — colab_05: improve PAGA-on-UMAP plot readability
+- `3687adf` — colab_05: fix sc.tl.diffusion_map → sc.tl.diffmap
+
+### Next session
+- Diagnose and fix the diffusion map batch effect problem. Options to explore:
+  1. Compute diffusion map on each dataset independently (per-dataset DPT, then compare)
+  2. Use the Harmony-corrected embedding directly for diffusion map input (if not already)
+  3. Subsample Bhaduri to balance dataset sizes before diffusion map
+  4. Use an alternative pseudotime method (e.g. Palantir, or PAGA-based pseudotime)
+- Continue colab_05 from section 7 onward once diffusion map issue is resolved
