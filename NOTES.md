@@ -649,3 +649,90 @@ Session hit 93% token usage before finishing the Colab run. Root cause: two full
   3. Subsample Bhaduri to balance dataset sizes before diffusion map
   4. Use an alternative pseudotime method (e.g. Palantir, or PAGA-based pseudotime)
 - Continue colab_05 from section 7 onward once diffusion map issue is resolved
+
+---
+
+## 2026-04-17 — Session 15
+
+### What we did
+- Diagnosed the joint DPT batch-effect problem identified in Session 14
+- Added a diagnostic cell (neighbor-mixing analysis) to quantify integration quality at the graph level
+- Ran colab_05 end-to-end (sections 7–14, plus new section 14a) in Colab
+- Documented the failure modes in the notebook and archived the executed notebook as `_DIAGNOSTIC`
+- Deleted `integrated_trajectory.h5ad` from Drive — pseudotime values are unreliable and should not propagate to colab_06
+
+### Structural changes to colab_05
+- **Section 6.5 (new markdown):** documents the joint-DPT batch-effect issue, the neighbor-mixing diagnostic, and the decision to treat sections 7–13 as diagnostic-only
+- **Section 14a (new):** cross-dataset comparisons on per-dataset pseudotime — 14a.1 cell-type ordering (rank-based), 14a.2 gene dynamics on percentile-normalized pseudotime
+- **Bug fix:** `groupby('cell_type_integrated', observed=True)` applied everywhere — silences pandas FutureWarning and prevents `ValueError: zero-size array` when lineage subsets have fewer cell types than the full categorical
+
+### Neighbor-mixing diagnostic (run as scratch cell in Colab)
+Ran on `adata.obsp['distances']` from the Harmony neighbor graph:
+- Zhong cells: **46% of their k-NN are Bhaduri** (full mixing would be ~99%)
+- Bhaduri cells: 99.9% Bhaduri neighbors (uninformative since Bhaduri is 99% of the composition)
+- **355 / 2,314 Zhong cells have zero Bhaduri neighbors** — these are microglia/OPCs/RBC residuals (fetal-only types, correctly isolated)
+- Conclusion: Harmony partially integrated shared cell types (50% cross-dataset mixing is meaningful) but the 100× imbalance (224k vs 2.3k) leaves enough residual batch structure that diffusion eigendecomposition picks up "dataset" as a top mode
+
+### Joint DPT results (sections 7–13, retained as diagnostic)
+- Eigenvalues [1.0, 0.999, 0.997, 0.995, 0.994] — suspiciously flat near 1, signature of weakly-connected components
+- DC1 vs DC2 scatter separates cells by *dataset*, not by cell type
+- Pseudotime UMAP: most Bhaduri cells compressed at PT ≈ 0 (root is in Bhaduri vRG territory); sparse artifactual highs in isolated islands; Zhong cells show no coherent developmental gradient
+
+### Per-dataset DPT results (section 14)
+- **Zhong independent:** pseudotime range [0.0, 1.0]. Spearman(GW, PT) = **0.407**, p = 3.42e-93. Weak positive signal (healthy DPT would reach 0.7–0.9). Direction correct but noisy.
+  - `Root cell index 189936 does not exist for 2314 samples. It's ignored.` — stale iroot inherited from joint object's `.uns`; explicit reassignment in cell 44 was not fully effective
+- **Bhaduri independent:** pseudotime range [0.0, 1.0]. No iroot warning (189936 happens to be within range for 224k cells, so no complaint from scanpy).
+  - Main population compressed into PT 0.009–0.15
+  - **Mature neurons at rank 3 of 19** (median 0.0124) — right next to vRG at rank 1 (0.0091). Biologically inverted.
+  - Two cell types on isolated UMAP island get artifactual extreme PT: "Cycling progenitors" (n=5,412, median 0.83) and "Stressed progenitors mixed" (n=1,101, median 0.69)
+- **Joint vs Bhaduri-independent ordering:** 19/19 identical cell-type ranks. Joint DPT was essentially Bhaduri's broken ordering with Zhong sprinkled in.
+
+### Cross-dataset comparison results (section 14a)
+- **14a.1:** Spearman(Bhaduri vs Zhong median PT, 15 shared cell types) = 0.743, p = 1.51e-03
+  - **Misleading**: inflated by two shared disconnected-cluster outliers both landing at top of both rankings. Remove those two and the remaining 13 cell types cluster in a tight blob.
+  - **vRG is rank 6 in Zhong** (should be rank 1 since it's the root) — confirms Zhong root was misplaced, consistent with the iroot warning having real effect
+- **14a.2:** Gene dynamics along percentile-normalized pseudotime
+  - Bhaduri SOX2 and VIM show clean declining trajectories ✓ (real biological signal exists in the compressed Bhaduri range)
+  - Bhaduri NEUROD2/TBR1/BCL11B essentially flat — because "Mature neurons" landed at low PT, neuronal markers never reach their up-phase
+  - Zhong NEUROD2/TBR1/BCL11B/DLX2/GAD1 show **peaks at middle PT (0.5–0.7)** — middle peak signature of a misplaced root (effective Zhong root was somewhere on neuronal lineage, not at vRG)
+  - Both datasets: terminal spikes at PT > 0.95 for HES1/GFAP/HOPX/MKI67 — disconnected island expresses those markers, gets artifactually placed at PT top
+
+### Three-part mechanistic diagnosis
+1. **100× dataset imbalance** → Harmony partially mixes but can't fully bridge → residual batch structure dominates diffusion eigendecomposition → joint DPT fails
+2. **Disconnected graph components** (microglia/OPCs/RBC in Zhong; "Cycling progenitors" isolated island in Bhaduri) → those clusters reach DPT only via long random-walk paths → artifactual extreme pseudotime → main population compressed near zero
+3. **Stale `iroot` propagation** via `.copy()` → `zhong_sub.uns['iroot']` inherits joint's 189936; explicit reassignment in cell 44 didn't fully override → Zhong effective root not at vRG
+
+### What is preserved (unaffected by this failure)
+- colab_01 through colab_04 results — clean, biologically sensible
+- PAGA topology (colab_05 section 4) — operates on group-level counts, not eigendecomposition; findings stand
+- `cell_type_integrated` annotations from colab_04 — solid
+- `integrated_annotated.h5ad` on Drive — still the correct upstream artifact for future DPT rebuilds
+
+### Ruled out
+- Datasets being biologically incompatible — Bhaduri SOX2/VIM decline is clean evidence of recoverable developmental signal
+- "Just go per-dataset" as a sufficient fix — per-dataset inherits the graph-structure problems and iroot problems
+
+### GitHub commits this session
+- `b2ba8f3` — colab_05: document joint-DPT batch effect, mark sections 7-13 as diagnostic-only
+- `01c381e` — colab_05: add section 14a — cross-dataset ordering + gene dynamics on per-dataset DPT
+- `9f9ff77` — colab_05: fix groupby(observed=True) — silences FutureWarning and prevents empty-array ValueError in lineage violins
+
+### Artifacts archived
+- `outputs_local/colab_05_trajectory_DIAGNOSTIC_WITH_OUTPUT.ipynb` — executed notebook showing the failure modes (to be added by user)
+- `integrated_trajectory.h5ad` — deleted from Drive (pseudotime values unreliable)
+
+### Next session — fix roadmap (prioritized)
+
+**Short-term (per-dataset DPT, preserves colab_03 through colab_04):**
+1. `del sub.uns['iroot']` immediately after `adata[...].copy()`, before diffmap — fixes Zhong root placement
+2. Drop disconnected cell types before per-dataset DPT: Zhong (microglia, OPCs, any RBC residuals); Bhaduri ("Cycling progenitors" + "Stressed progenitors mixed")
+3. Recompute PCA and HVGs per-dataset (not inherited from `X_pca_harmony`). Pipeline: `sc.pp.highly_variable_genes` → `sc.pp.pca` → `sc.pp.neighbors` → `sc.tl.diffmap` from scratch on each cleaned subset
+4. Validation gates: Zhong Spearman(GW, PT) should reach ≥ 0.7; Bhaduri Mature neurons should rank in upper half
+
+**Medium-term (joint DPT, requires redoing colab_03):**
+5. Subsample Bhaduri to 10–20k cells before integration. Expect Zhong neighbor-mixing 46% → 90%+.
+6. Swap Harmony → scVI. Handles imbalanced batches via batch-conditional generative modeling.
+7. Rerun colab_03 → colab_05 with rebalanced + scVI inputs.
+
+**Longer-term alternative (requires replacing upstream data):**
+8. Replace Zhong with a larger fetal dataset — Polioudakis 2019 (~40k cells, GW15–21) or Trevino 2021 (~57k cells, 10x multiome). The 100× imbalance is the single biggest pain point.
