@@ -736,3 +736,119 @@ Ran on `adata.obsp['distances']` from the Harmony neighbor graph:
 
 **Longer-term alternative (requires replacing upstream data):**
 8. Replace Zhong with a larger fetal dataset — Polioudakis 2019 (~40k cells, GW15–21) or Trevino 2021 (~57k cells, 10x multiome). The 100× imbalance is the single biggest pain point.
+
+---
+
+## 2026-04-17 — Session 16 (strategic pivot, planning only)
+
+### What we did
+Decided to replace Zhong entirely rather than patch DPT. Ran dataset due diligence on five candidate fetal atlases, worked through storage and balance tradeoffs, and landed on a concrete plan for Session 17.
+
+### Strategic decision: replace fetal dataset, don't patch DPT
+Session 15's fix roadmap had short-term patches (per-dataset DPT with iroot cleanup, disconnected-type removal) and a long-term alternative (replace Zhong). Chose long-term: if the 100× imbalance is the root cause, mini-patches just delay the reckoning. Rather rebuild on a compatible foundation now.
+
+### Constraints that shaped the choice
+- Storage: ~30 GB free on Google Drive (70/100 GB used, mostly project files)
+- RAM: paid Colab hits ceilings; High-RAM runtime needed for 226k-cell integration
+- Compatibility: same-platform same-lab data would simplify integration dramatically
+
+### Dataset evaluation
+
+| Dataset | Cells | GW range | Access | Verdict |
+|---------|-------|----------|--------|---------|
+| Zhong 2018 (current) | 2,394 | GW8–26 | Free | Replace — 100× imbalance with Bhaduri |
+| Polioudakis 2019 | 40k | GW17–18 | dbGaP phs001836 restricted | Ruled out — no institutional access, narrow GW |
+| Trevino 2021 | ~57k RNA | GW16, 20, 21, 24 | Free (GSE162170) | Backup — TSV format, only 4 donors |
+| Braun 2023 | 1.67M | ~GW7–13 (first trim.) | Free (EGA + GitHub links) | Ruled out — too early for late organoid biology |
+| Nowakowski 2017 | ~4,261 | GW5.85–37 | Free (UCSC) | Ruled out — Zhong-scale, Fluidigm C1 platform |
+| **Bhaduri 2021** | ~700k | GW14–25 | **Free processed via NeMO** | **SELECTED** |
+
+### Key correction during due diligence
+Initial dismissal of Bhaduri 2021 was wrong. The UCSC Cell Browser `desc.json` described data as "Raw Count Data in NeMO" with a NeMO URL. I saw dbGaP references nearby and inferred "restricted." Probing the URL directly showed:
+- Raw FASTQ files are dbGaP-restricted (standard for human subjects data)
+- Processed 10x count matrices are openly hosted on NeMO
+- HTTP 200 OK, ~26 MB per sample, 188 sample folders, 14 donors
+
+Inference collapsed too early. Actual probe would have caught this in one curl.
+
+### Selected dataset: Bhaduri 2021 (cortical subset)
+
+**Why it wins:**
+- Same lab as Bhaduri 2020 organoids (Kriegstein, UCSF) — same 10x Chromium v2/v3 chemistry, same NovaSeq S4 sequencing, same QC philosophy. Integration should be drastically cleaner than Zhong.
+- ~700k total cells → ~400k cortical subset → 170× more than Zhong
+- 14 donors across GW14–25 continuous — matches late organoid timepoints (weeks 15–24) where Bhaduri 2020 paper identified stress and divergence
+- Standard 10x MEX format, directly loadable with `sc.read_10x_mtx` — no custom parser (contrast with Bhaduri 2020's 166k-cell dense text matrix that took 3 attempts to load in Session 4)
+
+**URL pattern:** `https://data.nemoarchive.org/biccn/grant/u01_devhu/kriegstein/transcriptome/scell/10x_v2/human/processed/counts/{SAMPLE}/GRCh38/GRCh38.mex.tar.gz`
+
+**14 donors/timepoints:** GW14, GW15, GW16, GW17, GW18, GW18_2, GW19, GW19_2, GW20, GW20_31, GW20_34, GW22, GW22T, GW25.
+
+**Paper QC (from methods):** Scrublet for doublets, >750 genes/cell, <10% mito — very similar to Bhaduri 2020 thresholds (>200/>500 genes, <20% mito). Strict. "~700,000 cells passing all thresholds."
+
+### Decision: cortical subset only, not full brain
+Bhaduri 2020 organoids are *dorsal cortical* protocols — they generate cortical lineages (vRG, oRG, cortical excitatory neurons, MGE/CGE-lineage GABAergic interneurons). They have no thalamic, hypothalamic, cerebellar, midbrain, or striatal cells because those protocols weren't used.
+
+**Include** (cortex + interneuron sources):
+- Neocortical regions: PFC, motor, somato, parietal, V1, temporal, insula, cingulate
+- Ventricular-zone variants: PFCVZ, MotorVZ, ParVZ, SomatoVZ, TempVZ, V1VZ
+- Ganglionic eminences: MGE, CGE, LGE (source of migrating interneurons)
+
+**Exclude:**
+- thalamus, hypothalamus, cerebellum, midbrain, striatum, caudate, putamen, preoptic, claustrum, nucleus accumbens, hippocampus
+- All `CS*` folders (Carnegie-stage samples from an earlier, different study)
+
+Rationale: including non-cortical regions adds cell types with no organoid counterpart → muddles interpretation ("organoids don't have thalamus" is a protocol fact, not a biological finding) and makes integration harder.
+
+### Decision: balanced 1:1 subsampling at 100k per dataset
+
+Three revisions during the discussion:
+
+1. **Asymmetric** — keep 224k organoid + subsample fetal to 40k. Flaw: 5.6:1 imbalance still risks DPT eigendecomposition issues; Session 15 didn't characterize where the cliff is between 100:1 (broken) and balanced (fine).
+2. **Balanced at 40k+40k** — 1:1, tiny 1.2 GB file. Flaw: unnecessary data loss; we already ran at 226k (`integrated_annotated.h5ad` 7.57 GB) without issue.
+3. **Final: 100k+100k** — 1:1 balance, 200k total (slightly under known-working 226k scale), 6–7 GB integrated file. 2.5× more organoid statistical power than 40k, preserves rare types with stratified sampling, stays in known RAM/storage envelope.
+
+**Subsampling strategy (applied to both datasets):**
+- Stratify on **cell type × sample** simultaneously
+- For each cell type: take `min(n_cells, target_per_type)` — rare clusters (astrocyte progenitors ~1.4k, stressed progenitors mixed ~1.1k) contribute all their cells; common clusters get downsampled
+- Within each cell type: distribute the quota proportionally across samples, so every sample stays represented
+- Random seed fixed for reproducibility
+- **Where in pipeline:** after off-target cluster removal (Bhaduri 2020 clusters 9, 10, 16), before integration
+
+**Validation checks after subsampling:**
+1. Cell-type composition: full vs subset match within ~1% for common types; all rare types present
+2. Per-sample counts: every sample represented, proportions preserved
+3. Rerun UMAP + Leiden on subset → should recover same clusters with same markers
+4. QC distribution overlay (gene count, mito%): should be visually identical
+5. Top-10 marker genes per cluster: ≥80% overlap with full-dataset markers
+
+### Drive cleanup plan (~48–51 GB freeable)
+
+| File | Size | Action | Reason |
+|------|------|--------|--------|
+| `bhaduri_2020_preprocessed.h5ad` | **32.63 GB** | DELETE | Dense scaled-X bloat from colab_02 fix. Counts already sparse in `clustered.h5ad`'s `adata.raw`. |
+| `bhaduri_2020_raw.h5ad` | 2.6 GB | DELETE or keep | Redownloadable via colab_00 (now debugged). Safety net vs. max cleanup. |
+| `zhong_2018_raw.h5ad` | 464 MB | DELETE | Not using Zhong anymore |
+| `zhong_2018_preprocessed.h5ad` | ~400 MB | DELETE | Same |
+| `zhong_2018_clustered.h5ad` | ~400 MB | DELETE | Same |
+| `integrated_harmony.h5ad` | 7.5 GB | DELETE | Superseded, being fully replaced |
+| `integrated_annotated.h5ad` | 7.57 GB | DELETE | Cell-type annotations don't transfer — new integration has different cluster structure |
+| `bhaduri_2020_clustered.h5ad` | — | **KEEP** | Starting point: post-QC cells (241,776), sparse raw in `adata.raw`, Leiden labels, sample prefixes |
+
+After cleanup: ~80 GB free on Drive. Plenty of headroom.
+
+### Session 17 plan
+1. **Drive cleanup** — delete files above, free ~48–51 GB
+2. **Verify Bhaduri 2021 annotations** — quick probe: is `meta.tsv` accessible from UCSC Cell Browser for `dev-brain-regions`? If yes, merge annotations by barcode after download (trivial). If no, run fresh QC + cluster + annotate pass before subsampling (~1 extra session).
+3. **Download Bhaduri 2021 cortical samples** from NeMO — script walks index, filters by cortical keywords, downloads + extracts ~100 sample tarballs (~2.5 GB total), concatenates via `sc.read_10x_mtx` + `ad.concat`
+4. **Subsample both datasets to 100k** with stratified (sample × cell_type) sampling and min-floor for rare types
+5. **Redo colab_03 → colab_05** — Harmony integration with balanced 100k + 100k, re-annotation, trajectory
+
+### Methodological guardrails (saved to Claude's memory for future sessions)
+- **Big decisions need utmost care** — for architectural/methodological calls, require explicit alternatives with named failure modes and flagged assumptions, not just a recommendation. The Bhaduri 2021 near-miss (dismissed on shallow inference) and the 224k→40k→100k subsampling revisions both came from applying this rule.
+- **Plot interpretation accuracy** — reinforced ahead of re-running notebooks: only state what is clearly visible; say when unclear.
+- **Token conservation** — broadened from the existing notebook-read rule to general principles: parallel tool calls, no re-reading in-context files, summaries over dumps, no speculative exploration.
+
+### Open questions for Session 17
+- Does UCSC expose `meta.tsv` for `dev-brain-regions`? Determines whether Bhaduri 2021 subsampling is trivial (annotations available) or needs a full QC-cluster-annotate pass first
+- Confirm exact count of cortical sample folders after filtering (estimate: ~100 of 188 total GW folders)
+- Decide on hippocampus inclusion (defaulting to exclude for a clean cortical comparison, revisit if desired)
