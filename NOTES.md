@@ -852,3 +852,70 @@ After cleanup: ~80 GB free on Drive. Plenty of headroom.
 - Does UCSC expose `meta.tsv` for `dev-brain-regions`? Determines whether Bhaduri 2021 subsampling is trivial (annotations available) or needs a full QC-cluster-annotate pass first
 - Confirm exact count of cortical sample folders after filtering (estimate: ~100 of 188 total GW folders)
 - Decide on hippocampus inclusion (defaulting to exclude for a clean cortical comparison, revisit if desired)
+
+---
+
+## 2026-04-18 — Session 17 (Bhaduri 2021 download prep)
+
+### What we did
+- Drive cleanup executed — deleted preprocessed/integrated/annotated/trajectory h5ads and all Zhong files. Drive at 34/100 GB (Bhaduri 2020: clustered h5ad 5 GB + raw h5ad 2.4 GB + source .txt 1.5 GB)
+- Verified UCSC Cell Browser exposes annotations for Bhaduri 2021 — `meta.tsv` reachable at `https://cells.ucsc.edu/dev-brain-regions/neocortex/meta.tsv` (46.5 MB, 404,218 cells, 11 donors GW14–25). Columns: CellType, ConsensusCellType - Final, CombinedCluster - Final, Area, Age, Lamina, Individual, AgeRange. No re-cluster/re-annotate pass needed — saves one full session.
+- Built UCSC → NeMO sample mapping (74/75 samples, 396,202 / 404,218 cells = 98.0% coverage)
+- Wrote `notebooks/colab/colab_06_bhaduri2021_download.ipynb` (39.6 KB, 26 cells)
+- Pushed to GitHub (commit `4a08676`)
+
+### UCSC → NeMO mapping quirks resolved
+- V1 @ GW14 → NeMO `GW14_occipital` (V1 primordium is called occipital at that age)
+- motor @ GW19 → `GW19_M1`, somatosensory → `GW19_S1` (cortical area abbreviations used by NeMO for this donor)
+- GW25 parietal lamina samples: UCSC `parietalDL/MZ/OSVZ/UL/VZ` → NeMO `ParDL/ParMZ/ParOSVZ/ParUL/ParVZ` (Par abbreviation)
+- VZ variants: UCSC `ParietalVZ` → NeMO `ParVZ`, UCSC `TemporalVZ` → NeMO `TempVZ`
+- `GW20_PFC` / `GW20_V1` on UCSC → `GW20PFC` / `GW20V1` on NeMO (underscore dropped for that donor only)
+- Lowercase donors retained: `gw17_*` and `gw19_2_*` kept as-is in UCSC meta
+- `GW20_31` / `GW20_34` donors: UCSC uses `GW2031_*` / `GW2034_*` in Cell Name (no underscore); NeMO uses `GW20_31_*` / `GW20_34_*`
+
+### Sample drops and splits
+- **Dropped:** `GW18_temporal` (8,016 cells) — no NeMO folder exists. Loss absorbed because GW18 still has 4 other areas (PFC, V1, motor, parietal) and `GW18_2_temporal` covers temporal at GW18 from a different donor. 2% cell loss after 4× oversampling relative to 100k subsample target.
+- **Split-lane samples (10 total):** GW22, GW22T, GW22L series have `_1` / `_2` lane pairs on NeMO. These get merged into a single UCSC sample via `ad.concat` during loading (21 NeMO folders → 10 UCSC samples).
+
+### NeMO URL conventions (3 discovered)
+All 83 tarball URLs HEAD-probed during authoring, exact paths baked into notebook:
+
+| Pattern | Count | Donors |
+|---------|-------|--------|
+| `{folder}/{folder}.mex.tar.gz` | 69 | most |
+| `{folder}/GRCh38/GRCh38.mex.tar.gz` | ~5 | GW17 samples |
+| `{folder}/filtered_feature_bc_matrix/filtered_feature_bc_matrix.mex.tar.gz` | ~7 | gw19_2 samples |
+
+Memory's originally-recorded URL pattern (GRCh38 subdir) was incomplete — covers only ~6% of folders.
+
+### colab_06 pipeline
+1. Mount Drive, set paths (tarballs to Colab ephemeral `/content/bhaduri2021/`; final h5ad to Drive `data/processed/bhaduri_2021/`)
+2. Install scanpy
+3. Inline `SAMPLES` dict (74 entries with baked URLs)
+4. Download loop with skip-if-exists (~3.3 GB total, ~5–15 min on Colab)
+5. Extract with recursive MEX-dir finder (handles all 3 internal layouts)
+6. Per-sample loader: strips 10x `-N` barcode suffix → prepends UCSC prefix → attaches `donor`/`area`/`age_gw`/`source_tarball` obs columns → merges split-lane pairs
+7. Global concat (inner gene join) → ~396k cells × shared genes
+8. Download UCSC `meta.tsv`, run barcode-overlap sanity check
+9. Inner-join annotations; renames `ConsensusCellType - Final` → `cell_type`
+10. Sanity prints (donor × area crosstab, cell-type distribution)
+11. Save `bhaduri_2021_raw.h5ad` to Drive
+
+### Design decisions (and why)
+- **Colab over local script** — avoids ~5–8 GB residential upload on every rerun iteration; Colab Pro RAM comfortably handles the 396k-cell concat; matches established compute split.
+- **Tarballs on Colab ephemeral, not Drive** — 3.3 GB of downloads are regeneratable; only h5ad goes to Drive.
+- **Inner-join on UCSC annotations** rather than re-clustering — saves a full session of QC + cluster + annotate work; label consistency with published paper.
+- **Drop GW18_temporal** rather than probe `wholebrain` sibling — recovering 2% cells doesn't justify risk of inconsistent labels from a different clustering run.
+
+### Known risk flagged in notebook
+For the 10 split-lane samples (GW22 series), two tarballs may contribute cells with overlapping raw barcodes (separate 10x runs share barcode space by chance). The step-9 barcode-overlap cell reveals the actual match rate against UCSC. If overlap is low, iterate on lane-disambiguation logic (likely: append lane index to barcode before UCSC match).
+
+### GitHub commits this session
+- `4a08676` — colab_06: Bhaduri 2021 NeMO download + UCSC annotation merge
+
+### Next session
+1. Run `colab_06` on Colab → produce `bhaduri_2021_raw.h5ad` (expected ~5 GB)
+2. Inspect overlap sanity check; iterate on split-lane logic if needed
+3. Write `colab_07_preprocessing.ipynb` — QC + HVG + PCA on both datasets
+4. Stratified subsample to 100k + 100k (Task 4)
+5. Rerun colab_03 → colab_05 with balanced inputs
