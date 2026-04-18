@@ -919,3 +919,94 @@ For the 10 split-lane samples (GW22 series), two tarballs may contribute cells w
 3. Write `colab_07_preprocessing.ipynb` — QC + HVG + PCA on both datasets
 4. Stratified subsample to 100k + 100k (Task 4)
 5. Rerun colab_03 → colab_05 with balanced inputs
+
+---
+
+## 2026-04-18 — Session 17 (continued — colab_06 executed end-to-end)
+
+### What we did
+- Ran `colab_06_bhaduri2021_download.ipynb` on Colab High-RAM runtime, end-to-end.
+- Hit one source-data bug mid-run, debugged it live, patched the notebook, pushed.
+- Final h5ad written to Drive: `data/processed/bhaduri_2021/bhaduri_2021_raw.h5ad` — **396,186 cells × 33,694 genes**.
+- Step 3 of Session 17 plan complete. Step 4 (stratified subsample) deferred.
+
+### Mid-run bug — `enes.tsv` typo in source archives
+
+**Symptom.** First run of Ch.7 per-sample loading crashed on `GW14_motor` with `FileNotFoundError`. `sc.read_10x_mtx()` couldn't locate the gene file.
+
+**Diagnosis.** Listed the contents of several extracted MEX folders and discovered two issues in the original Bhaduri lab tarballs hosted on NeMO:
+
+1. **Inconsistent gene filename** across folders — some use `genes.tsv` (10x v2), others `features.tsv` (10x v3). `sc.read_10x_mtx()` tolerates both only with the expected `.gz` extension.
+2. **Corrupted filename** — `GW14_motor` and `GW18_PFC` ship `enes.tsv` instead of `genes.tsv` (missing leading `g`). File dated **Apr 12 2019** — the typo is in the source archive, not from extraction.
+3. **Mixed compression** — some folders ship gzipped MEX, others uncompressed.
+
+**Fix.** Replaced `sc.read_10x_mtx()` with a custom `read_mex()` helper that:
+- accepts `.mtx` / `.tsv` either gzipped or plain,
+- recognizes `features.tsv*` and `genes.tsv*`,
+- falls back to a glob match on `*.tsv*` (excluding `barcodes`) if neither is found — catches `enes.tsv` and any future filename drift.
+
+**Outcome.** Loop completed cleanly: 74/74 samples loaded, 1,003,812 raw cells × 33,694 genes.
+
+### Notebook update committed
+- New code cell with `read_mex()` helper added at top of Ch.7 (markdown header `### 7.0 Robust MEX Loader (helper)`)
+- One-line change in main loading cell: `sc.read_10x_mtx(mex_dir, var_names='gene_symbols', cache=False)` → `read_mex(mex_dir)`
+- Two diagnostic cells appended at end of Ch.7 (`### 7.1 Diagnostic — Survey MEX Folder Contents`, `### 7.2 Diagnostic — File Listing for the Anomalous Folder`) documenting the file-layout finding for future readers
+- Commit `eee271b` — `colab_06: add robust read_mex() loader and diagnostic cells`
+
+### Headline run results
+
+| Stage | Output |
+|-------|--------|
+| Ch.7 — per-sample loading | 74/74 samples loaded, 1,003,812 cells × 33,694 genes |
+| Ch.8 — concatenate (inner gene join) | 1,003,812 × 33,694 (no gene drops — all samples used same GRCh38 reference, inner join was a true no-op) |
+| Ch.9 — UCSC barcode overlap | Our cells 1,003,812 / UCSC cells 404,218 / **overlap 396,186 (98.0% of UCSC)** / our unmatched 607,626 / UCSC unmatched 8,032 |
+| Ch.9 — annotation merge | **396,186 cells × 33,694 genes** |
+| Ch.11 — h5ad on Drive | `bhaduri_2021_raw.h5ad` |
+
+The 607,626 cells dropped on our side are pre-QC cells from raw NeMO MEX that UCSC discarded during their own QC/clustering — expected, not a bug. The 8,032 cells unmatched on UCSC's side ≈ the dropped `GW18_temporal` sample (8,016) plus ~16 stragglers. Mapping was clean.
+
+### Sanity-check findings (Ch.10)
+
+**Donor × area crosstab.** Per-sample counts match UCSC's published per-sample sizes ~exactly (e.g., GW18×PFC 13,785 vs UCSC 13,786; GW19_2×Motor 11,178 vs 11,178). Confirms UCSC-published count *is* post-QC count. Predicted small samples present (`GW2034×motor` = 51, `GW2034×parietalVZ` = 3).
+
+**Coarse cell type distribution (`cell_type_coarse`).**
+| Type | Count | % |
+|------|-------|---|
+| Neuron | 201,168 | 50.8% |
+| Interneuron | 59,955 | 15.1% |
+| RG | 38,835 | 9.8% |
+| Dividing | 32,033 | 8.1% |
+| **Outlier** | **30,117** | **7.6%** |
+| IPC | 13,605 | 3.4% |
+| Microglia | 9,765 | 2.5% |
+| OPC | 7,293 | 1.8% |
+| Vascular | 3,149 | 0.8% |
+| CR | 266 | 0.07% |
+
+Neuron + Interneuron = 65.9% — sensible for fetal cortex. Glia minimal — gliogenesis ramps later. Outlier 7.6% should be dropped in preprocessing.
+
+**Fine cell type (`cell_type` = UCSC `ConsensusCellType - Final`).** Only **12 unique values**, essentially same granularity as coarse — no RG-Outer / Glut-DL / Glut-UL subtypes as I expected. For finer subtypes either use a different UCSC column or build via re-clustering. Notable bucket: literal string `"0"` with 50,447 cells (12.7%) — UCSC's unassigned placeholder.
+
+**To drop before subsampling (Step 4):** ~80k cells = Outlier (30k coarse) + `cell_type == "0"` (50k fine) ≈ 20% of the 396k pool. Real working pool ≈ 316k.
+
+**n_genes per cell (`X.getnnz(axis=1)`):** min 477 / median **1,228** / max 10,741. Median is on the low side for 10x v2 (typical 1,500–3,500). Two non-exclusive explanations: lenient UCSC QC, and/or fetal cells' lower complexity. Bhaduri 2020 organoids use the same v2 chemistry so should be comparable. Real QC filter applied in next preprocessing notebook.
+
+### Other observations
+- `donor` obs column has 13 entries but Bhaduri 2021 has 11 biological donors. Our prefix parser conservatively split GW18 vs GW18_2, GW22 vs GW22T vs GW22L. Canonical donor = `individual` column from UCSC merge.
+- `area` obs column has 33 entries with case/spelling redundancy (motor/Motor, somato/somatosensory/SS, V1/V1_all/V1_CP, etc.). Canonical area = `area_ucsc` from the UCSC merge.
+- GW range covered: [14, 17, 18, 19, 20, 22, 25] — full developmental window.
+
+### Imbalance after the swap
+- Bhaduri 2020 organoids (post-QC, post off-target removal): ~242k starting → ~226k integrated previously
+- Bhaduri 2021 fetal: 396k raw → ~316k after dropping Outlier + "0"
+- New imbalance: ~1.6× — vs. Zhong 2018's ~100× imbalance that broke DPT in Session 15. This is the entire reason for the swap.
+
+### GitHub commits this session
+- `eee271b` — colab_06: add robust read_mex() loader and diagnostic cells
+
+### Next session
+1. **Step 4** — write `colab_07_stratified_subsample.ipynb` (or similar). Open design questions to decide first:
+   - Stratification axes (Bhaduri 2020: protocol × age; Bhaduri 2021: age_gw × cell_type_coarse or × area_ucsc)
+   - Drop `Outlier` + `cell_type == "0"` *before* subsampling (recommended) or after
+   - Fix random seed; output `bhaduri_2020_100k.h5ad` and `bhaduri_2021_100k.h5ad`
+2. **Step 5** — rerun colab_03 → colab_05 with balanced 100k + 100k inputs
