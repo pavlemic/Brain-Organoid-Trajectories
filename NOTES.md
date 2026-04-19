@@ -1010,3 +1010,20 @@ Neuron + Interneuron = 65.9% — sensible for fetal cortex. Glia minimal — gli
    - Drop `Outlier` + `cell_type == "0"` *before* subsampling (recommended) or after
    - Fix random seed; output `bhaduri_2020_100k.h5ad` and `bhaduri_2021_100k.h5ad`
 2. **Step 5** — rerun colab_03 → colab_05 with balanced 100k + 100k inputs
+
+
+## Session 18 — 2026-04-19 — planning
+
+Short planning check-in before the next coding session. Locking in the order of work on the Bhaduri 2021 swap so Step 4 doesn't drift.
+
+### Plan for next working session
+1. Draft `colab_07_stratified_subsample.ipynb`:
+   - Drop `Outlier` (coarse) and `cell_type == "0"` (fine) *before* subsampling
+   - Stratify Bhaduri 2021 by `age_gw × cell_type_coarse`; Bhaduri 2020 by `protocol × age`
+   - Fixed seed; target 100k each; write `bhaduri_2020_100k.h5ad` and `bhaduri_2021_100k.h5ad`
+2. Sanity-check stratum counts post-subsample — no stratum should collapse below a usable floor (tentatively ≥200 cells; confirm when I see the distribution).
+3. Only then rerun colab_03 → colab_05 with the balanced inputs.
+
+### Open questions to resolve before coding
+- Stratum floor: hard drop strata under threshold, or upsample with replacement? Leaning hard drop — upsampling risks fake density in DPT.
+- Whether to stratify by `area_ucsc` as a secondary axis, or leave area out to keep strata from fragmenting.
