@@ -1027,3 +1027,53 @@ Short planning check-in before the next coding session. Locking in the order of 
 ### Open questions to resolve before coding
 - Stratum floor: hard drop strata under threshold, or upsample with replacement? Leaning hard drop — upsampling risks fake density in DPT.
 - Whether to stratify by `area_ucsc` as a secondary axis, or leave area out to keep strata from fragmenting.
+
+
+## Session 19 — 2026-04-21 — colab_07 authored end-to-end (Step 4 notebook built, not yet run)
+
+Resolved both open questions from Session 18, then built `colab_07_stratified_subsample.ipynb` through to completion. Notebook is ready to execute in Colab; deferred the run itself to the next working session (will use Colab high-RAM — Bhaduri 2021 at 396k × 33,694 plus the `.copy()` spikes after filter/subsample are borderline on standard 12 GB).
+
+### Methodological decisions
+
+**Q1 — Stratum floor handling: hard-drop under 200 cells, no upsampling.** Upsampling duplicates cells at *zero distance* in the kNN graph. That is exactly the pathology that broke DPT in Session 15 (disconnected components, stale iroot, artifactual ranks). Hard-drop loses a small fraction of rare strata but does not pollute the graph.
+
+**Q2 — Do not stratify by `area_ucsc`.** Three reasons: (a) Bhaduri 2020 organoids have no anatomical-area metadata, so the axis would be asymmetric between datasets, (b) adding area to Bhaduri 2021 fragments strata from ca. 120 → ca. 1,200 (most below the 200 floor), (c) areal identity is a Phase-2 question — Phase 1 is maturation trajectories.
+
+**Other parameters:** seed = 42; per-stratum targets via largest-remainder rule (guarantees sum = exactly 100,000); filter Outlier + `cell_type == "0"` *before* stratification.
+
+### Notebook structure (8 sections)
+- **§0 Setup** — pip install scanpy, mount Drive.
+- **§1 Load Bhaduri 2020** — `bhaduri_2020_clustered.h5ad` (241,776 × 16,774; 37 samples). Discovered `obs` has no `protocol` / `age` columns — must derive from the `sample` prefix.
+- **§2 First regex** — clean pattern `^{line}{[SXP]}Week{N}$`. Parses **28/37** samples.
+- **§3 Investigate failures** — 9 unmatched samples carry **57,718 cells (23.9%)**. Too large to drop. Two edge-case families: `H28126S2Week*` (fold S2→S) and `Week{N}{S,P}` (reverse-order, label line as `unknown`).
+- **§4 Final parser** — three ordered regex patterns (variant / standard / reverse). **37/37 samples, 241,776 / 241,776 cells mapped.** Cell-level `protocol × age_week` grid:
+
+  | protocol \ age_week | 3 | 5 | 8 | 10 | 15 | 24 |
+  |---|---|---|---|---|---|---|
+  | P | 0 | 14,228 | 16,697 | 13,367 | 0 | 1,591 |
+  | S | 18,017 | 45,757 | 29,567 | 48,183 | 2,718 | 2,914 |
+  | X | 20,321 | 10,126 | 2,427 | 15,863 | 0 | 0 |
+
+  14 populated strata. Lowest = X×8 at 2,427 — order of magnitude above floor, so hard-drop removes 0 cells from Bhaduri 2020. Rough per-protocol 100k share: S ≈ 63k, P ≈ 19k, X ≈ 19k.
+- **§5 Bhaduri 2020 subsample** — largest-remainder proportional targets, `rng.choice(replace=False)` per stratum, `.copy()` to preserve `adata.raw`, save `bhaduri_2020_100k.h5ad` to Drive, free memory.
+- **§6 Bhaduri 2021 load + filter** — load `bhaduri_2021_raw.h5ad`, drop Outlier + `cell_type == "0"` (expected ca. 80k / 20% loss → ca. 316k remaining), apply 200-floor on `age_gw × cell_type_coarse` grid.
+- **§7 Bhaduri 2021 subsample** — same method as §5, save `bhaduri_2021_100k.h5ad`.
+- **§8 Joint sanity checks** — reload both 100k files, verify shape parity, compute gene-space overlap (expect ca. 14k–16k shared of Bhaduri 2020's 16,774).
+
+Each section has a markdown intro and a `### Finding` markdown cell so the notebook reads as a self-explanatory lab narrative.
+
+### Bugs hit and fixed while authoring
+- `pandas.NotImplementedError: initializing a Series from a MultiIndex` when mapping a dict-of-tuples onto a Categorical series. Fixed by splitting into two dicts (`protocol_map`, `age_map`) and mapping each column independently.
+- Initial regex was single-pattern and missed 9 samples (23.9% of cells). Resolved via ordered 3-pattern parser (variant tried before standard; reverse pattern with `line='unknown'` for Week-prefixed names).
+- Section 8 `Finding` markdown used `~` for "approximately" throughout the notebook; Jupyter/Colab renderer interpreted paired `~` as strikethrough. Swept all markdown cells and replaced `~` → `ca.`.
+
+### GitHub commits this session
+- `5c9adac` — colab_07: authored — Bhaduri 2020 sample parser (37/37), cell-level protocol×age grid
+- `bf6b55d` — colab_07: add Sections 5-6 — Bhaduri 2020 subsample to 100k, Bhaduri 2021 load + filters
+- `20ce7e9` — colab_07: add Sections 7-8 — Bhaduri 2021 subsample to 100k, joint sanity checks
+- `c3b0d85` — colab_07: replace ~ with ca. in markdown cells to avoid strikethrough rendering
+
+### Next session
+1. **Run `colab_07_stratified_subsample.ipynb` in Colab with high-RAM.** Verify: 37/37 parse, cell-level grid matches table above, Section 5 writes `bhaduri_2020_100k.h5ad` at (100000, 16774), §6 filter drops ca. 80k, §7 writes `bhaduri_2021_100k.h5ad` at (100000, 33694), §8 shared genes in ca. 14k–16k range.
+2. If §8 shared gene count is below ca. 12k, investigate nomenclature mismatch between the two reference annotations before proceeding.
+3. **Step 5** — rerun `colab_03_integration.ipynb` on the balanced 100k + 100k inputs (concatenate on shared gene space, add `dataset` label, normalize, HVG, PCA, Harmony, Leiden, save `integrated_harmony.h5ad`). Then rerun colab_04 (annotation) and colab_05 (trajectory). The 100×-imbalance failure mode that broke DPT in Session 15 should be gone.
