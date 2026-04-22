@@ -1077,3 +1077,54 @@ Each section has a markdown intro and a `### Finding` markdown cell so the noteb
 1. **Run `colab_07_stratified_subsample.ipynb` in Colab with high-RAM.** Verify: 37/37 parse, cell-level grid matches table above, Section 5 writes `bhaduri_2020_100k.h5ad` at (100000, 16774), §6 filter drops ca. 80k, §7 writes `bhaduri_2021_100k.h5ad` at (100000, 33694), §8 shared genes in ca. 14k–16k range.
 2. If §8 shared gene count is below ca. 12k, investigate nomenclature mismatch between the two reference annotations before proceeding.
 3. **Step 5** — rerun `colab_03_integration.ipynb` on the balanced 100k + 100k inputs (concatenate on shared gene space, add `dataset` label, normalize, HVG, PCA, Harmony, Leiden, save `integrated_harmony.h5ad`). Then rerun colab_04 (annotation) and colab_05 (trajectory). The 100×-imbalance failure mode that broke DPT in Session 15 should be gone.
+
+---
+
+## Session 20 — 2026-04-22 — colab_07 executed end-to-end (Step 4 complete)
+
+### What we did
+- Ran `colab_07_stratified_subsample.ipynb` on Colab high-RAM. All 8 sections executed successfully.
+- Produced two balanced subsample files on Drive:
+  - `bhaduri_2020_100k.h5ad` — (100000, 16774), raw=True, 2.02 GB
+  - `bhaduri_2021_100k.h5ad` — (100000, 33694), raw=False, 1.64 GB
+- Post-run: rewrote all stale "Expected" markdown cells in `_WITH_OUTPUT` notebook (9 cells), added new before-cells, and added cell ID headers to all 15 code cells via Python scripts.
+- Established notebook-structure and communication conventions (saved to memory).
+
+### Key findings from the run
+
+**Bhaduri 2020 (5a/5b):**
+- 14/14 strata passed floor, 0 dropped. Lowest = X×8 at 2,427 cells.
+- Per-protocol targets: S = 60,864, X = 20,158, P = 18,978 (sum = 100,000). Uniform rate = 41.4%.
+- Proportions matched original to 4 decimal places on both axes.
+
+**Bhaduri 2021 (6a/6b/6c/6d + 7a/7b):**
+- Filter dropped **50,447 cells (12.7%)** — not the estimated ca. 80k. Discovery: **Outlier ⊂ cell_type == "0"**. All 30,117 Outlier cells had cell_type="0", plus an additional 20,330 Neuron-coarse cells with cell_type="0" (UCSC fine classifier couldn't assign a subtype). Single mask catches both.
+- After filter: 345,739 cells. 52 strata populated, 46 passed 200-floor, **6 dropped (387 cells, 0.11%)**:
+  - CR at GW17 (124), GW18 (46), GW19 (96) — CR too sparse (266 total)
+  - Microglia at GW14 (18), IPC at GW14 (50), Vascular at GW14 (53)
+- **CR = 0 in the 100k subsample** — all CR strata below floor. CR will be absent from integration onward.
+- Proportions matched to 4 decimals. raw=False (expected — 2021 raw file, .X IS counts, no separate .raw slot).
+
+**Gene space (8a/8b):**
+- Shared: **16,768 genes** (ca. 15% more than old Zhong integration's 14,498).
+- Bhaduri 2020 only: 6 genes — all carry `.1` suffix (Cell Ranger duplicate-symbol artifact, e.g. `MATR3.1`, `RGS5.1`). No biologically meaningful loss.
+- Integration in colab_03: use `adata20.raw.to_adata()` for 2020 counts; use `adata21` directly for 2021 (raw=False).
+
+### Notebook structure decisions (saved to memory)
+- **Cell ID convention:** `<section><letter>` prefix in before-markdown `###` headers (e.g. `### 6b — Drop Outlier cells`). Resets per section.
+- **Three-phase notebook lifecycle:**
+  1. Empty/authoring (pushed to GitHub): cell IDs + before-cells only, no after-findings.
+  2. Run (Colab): produce outputs, download as `_WITH_OUTPUT` into `outputs_local/`.
+  3. Final (_WITH_OUTPUT): add after-findings written against actual observed values.
+- **Interpretive markdown written AFTER run** — never pre-fill "Expected" text.
+- Switch to Sonnet for NOTES.md / memory updates to save tokens.
+
+### GitHub commits this session
+- None. _WITH_OUTPUT edits are local (`outputs_local/`). Empty notebook in repo unchanged.
+
+### Next session (Step 5)
+1. Rerun `colab_03_integration.ipynb` on `bhaduri_2020_100k.h5ad` + `bhaduri_2021_100k.h5ad`:
+   - Subset both to shared 16,768 genes
+   - Add `dataset` label, normalize, HVG (2,000), PCA, Harmony, Leiden, save `integrated_harmony.h5ad`
+2. Rerun `colab_04_cell_type_annotation.ipynb` on new integrated object.
+3. Rerun `colab_05_trajectory.ipynb` — 1:1 balance (100k vs 100k) should fix the 100× imbalance that broke DPT in Session 15.
