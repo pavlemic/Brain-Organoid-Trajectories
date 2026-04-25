@@ -1128,3 +1128,95 @@ Each section has a markdown intro and a `### Finding` markdown cell so the noteb
    - Add `dataset` label, normalize, HVG (2,000), PCA, Harmony, Leiden, save `integrated_harmony.h5ad`
 2. Rerun `colab_04_cell_type_annotation.ipynb` on new integrated object.
 3. Rerun `colab_05_trajectory.ipynb` — 1:1 balance (100k vs 100k) should fix the 100× imbalance that broke DPT in Session 15.
+
+---
+
+## Session 21 — 2026-04-25 — colab_08 written + run, integration result mixed (cluster 0 red flag)
+
+### What we did
+- Wrote `colab_08_integration_balanced.ipynb` to integrate balanced 100k + 100k subsamples (Bhaduri 2020 organoids + Bhaduri 2021 fetal). Replaces colab_03. Pushed empty notebook to GitHub (`80621c3`).
+- Ran end-to-end on Colab high-RAM. Final output: `integrated_100k_harmony.h5ad` on Drive, **5.54 GB**, shape (200000, 2000). Predicted 6–7 GB; came in below.
+- Mid-run discovered a structural bug in the assumption that Bhaduri 2020's `.raw.X` held raw counts. Fixed both inline and canonically.
+- Promoted 2 ad-hoc diagnostic cells from this session into the canonical empty notebook (7b Harmony shift diagnostic, 9c per-marker individual plots).
+- Established a new project-wide notebook rule: every multi-panel plot must be accompanied by per-panel full-size individual plots.
+- Annotated `outputs_local/colab_08_integration_balanced_WITH_OUTPUT.ipynb` with 21 finding markdown cells written against the real observed values.
+
+### Key discovery — `.raw.X` contents were misremembered
+Cell 2b range check revealed Bhaduri 2020's `.raw.X` is **log(CP10K+1) data**, not raw counts. The Session 20 memory note was wrong. What's stored is the standard scanpy `.raw` snapshot — taken in colab_01 *after* `normalize_total` + `log1p`, *before* HVG/scaling.
+
+| dataset | `.X` content | dtype | range | integer-like |
+|---|---|---|---|---|
+| Bhaduri 2020 (after 2a `.raw.X` → `.X`) | log(CP10K+1) | float32 | 0.16 – 6.91 | No |
+| Bhaduri 2021 (raw=False) | raw counts | int64 | 1 – 146 | Yes |
+
+Raw counts for 2020 are unrecoverable — `bhaduri_2020_raw.h5ad` was deleted in Session 17 cleanup.
+
+**Pivot applied (canonical notebook + memory updated):**
+- Added new cell 2c: `normalize_total` + `log1p` on Bhaduri 2021 to bring it to log(CP10K+1) matching 2020.
+- HVG flavor in 5b changed from `seurat_v3` (requires raw counts) to `seurat` (works on log-normalized `.X`).
+- Section 5a's planned norm+log skipped (already done).
+
+### Run metrics (real observed)
+- **Gene intersection**: 16,768 shared (matches Session 20 prediction exactly). Lost from 2020: 6 (the `.1`-suffixed Cell Ranger duplicates). Lost from 2021: 16,926.
+- **Concat**: 200,000 × 16,768, exact 50/50 dataset split.
+- **HVG (`flavor='seurat'`, `batch_key='dataset'`)**: 2,000 selected. **751 (37.6%) HV in both batches** (core shared signal); **1,249 (62.4%) HV in one only**.
+- **PCA (30 comps)**: PC1 = 3.23%, PC2 = 2.09%, PC3 = 1.26%, cumulative = 16.3%. PC1 not dominant → no strong batch axis pre-Harmony.
+- **Harmony converged in 2 iterations** (vs colab_03's 33) — triggered diagnostic 7b.
+- **7b Harmony shift diagnostic**: mean abs shift = 0.626, max = 11.91, std = 1.01. Real per-cell work confirmed. The 2-iteration convergence is the benign interpretation — pre-aligned inputs (same lab, same chemistry, 1:1 balance) being efficiently corrected, not a premature stop.
+- **Leiden (`res=0.5`)**: 21 clusters (vs colab_03's 19). Healthy distribution from 23,737 (cluster 0) → 908 (cluster 20).
+
+### Visual diagnostics (9a–9c)
+
+**9a (UMAP by dataset)** — mixed verdict. Substantial intermixing in the central body, but clear 2020-dominant region on the right, 2021-dominant region on the bottom-left, and small isolated 2020-only islands at the top edge. No catastrophic stripe-failure pattern.
+
+**9c (markers, individual full-size plots)** — clean dorsal-ventral progenitor split recovered:
+
+| Region | Markers present | Cell identity |
+|---|---|---|
+| **Right** | PAX6 + SOX2 + MKI67 + EOMES (patch) | Cortical radial glia, actively cycling, with intermediate progenitors |
+| **Top-left** | SOX2 + GAD1 + GAD2 (PAX6 absent / low) | Subpallial / GE-like progenitors and GABAergic interneurons (SOX2⁺ PAX6⁻ ventral signature) |
+| **Bottom-left** | TBR1 + NEUROD2 | Mature excitatory cortical neurons |
+| **Central** | EOMES + some MKI67 | IPC transition zone |
+
+Classic cortical lineage path PAX6 → EOMES → TBR1 traces **right → center → bottom-left** on the UMAP. Subpallial GE → interneuron lineage forms a separate path in the top-left. Recovering this dorsal-ventral split independently is a strong signal that integration preserved real biological structure.
+
+**Incident:** initial thumbnail-only read of the combined 9c grid placed SOX2/PAX6 overlap in the top-left when it was actually on the right. User caught the mistake. Triggered the new project rule (`feedback_plots_individual.md`): always render per-panel full-size plots alongside any multi-panel grid.
+
+### Composition (9d) — concerning quantitative result
+
+| regime | clusters | cells |
+|---|---|---|
+| balanced (35–65%) | 1 (51/49), 10 (36/64), 16 (64/36) | 39,156 |
+| 2020-pure (>95%) | 0 (98.7%, **23,737**), 3 (98.2%), 17 (98.1%) | 41,951 |
+| 2021-pure (>95%) | 8 (94.9%), 11 (98.4%), 12 (98.6%), 13 (96.4%), 14 (99.6%), 15 (98.2%), 18 (98.8%) | 41,950 |
+| moderately skewed (70–90%) | 2, 4, 5, 6, 7, 9, 19, 20 | rest |
+
+**ca. 41% of each dataset's cells live in >95%-pure clusters.** Biology-only ceiling is ca. 10–15% (2021's microglia ~2.5% + OPCs ~1.8% + vascular ~0.8% + mature astrocytes; 2020's choroid plexus + stress + dying cells per Session 11). **Observed 41% is well above the biology-only ceiling.**
+
+**Biggest red flag — cluster 0**: 23,737 cells (24% of all 2020) at 98.7% organoid-pure, located in the cortical RG zone (right region with PAX6 + SOX2 + MKI67 per 9c). Bhaduri 2021 has 9.8% RG in `cell_type_coarse` (~9,800 fetal RG expected); they should partially populate this cluster. They don't.
+
+### Decision
+Proceed to colab_09 annotation as the disambiguating diagnostic.
+- **If cluster 0 = vRG / cortical RG (shared cell type)** → Harmony under-corrected. Remediation paths: re-integrate with intersection-only HVGs (drop from 2,000 to the 751 HV-in-both subset), increase Harmony `theta`, or switch to scVI.
+- **If cluster 0 = choroid plexus or stress (organoid-only biology)** → 41% is mostly real biology; proceed with caveats.
+
+The 1:1 balance is what makes this diagnostic visible at all — at colab_03's 100× imbalance every Zhong-dominant cluster would have been 99%+ Zhong by sheer numbers, hiding the same problem if it existed.
+
+### Memory / notebook-rules added this session
+- `feedback_plots_individual.md` — multi-panel plot grids must be accompanied by per-panel individual full-size plots. Triggered by the 9c thumbnail misread.
+- Memory note "Raw asymmetry" corrected: 2020's `.raw.X` is log-normalized, not counts. HVG flavor must be `seurat` (not `seurat_v3`) until/unless raw counts are recovered.
+
+### GitHub commits this session
+- `80621c3` — colab_08: authored — integration of balanced 100k + 100k (Bhaduri 2020 + 2021)
+- `02370d0` — colab_08: add pip install cell — scanpy/leidenalg/harmonypy not preinstalled on Colab
+- `96f863b` — colab_08: fix processing-stage handling — 2020 .raw.X is log-normalized, not counts
+- `fc7b696` — colab_08: add 7b — Harmony shift diagnostic
+- `6fdc60b` — colab_08: 9c — also save individual full-size plots per marker
+
+### Next session (colab_09)
+1. **Annotate cluster 0 first** — that single annotation decides whether colab_08 needs re-running.
+   - vRG / cortical RG → trigger remediation path.
+   - Choroid plexus / stress → proceed with caveats.
+2. Carry through `age_week` / `age_gw` / `protocol` / `sample` / `donor` / `area_ucsc` post-concat for visualization (these were dropped during `ad.concat`'s outer join with NaN-fill).
+3. Annotate all 21 clusters via marker gene analysis (same pattern as old colab_04).
+4. **If remediation needed**: try intersection-only HVGs (751 genes) before reaching for scVI — cheaper test of the same hypothesis.
