@@ -1220,3 +1220,56 @@ The 1:1 balance is what makes this diagnostic visible at all — at colab_03's 1
 2. Carry through `age_week` / `age_gw` / `protocol` / `sample` / `donor` / `area_ucsc` post-concat for visualization (these were dropped during `ad.concat`'s outer join with NaN-fill).
 3. Annotate all 21 clusters via marker gene analysis (same pattern as old colab_04).
 4. **If remediation needed**: try intersection-only HVGs (751 genes) before reaching for scVI — cheaper test of the same hypothesis.
+
+---
+
+## Session 22 — 2026-04-28
+
+### Goal
+Annotate cluster 0 from colab_08 to decide: shared cortical RG (Harmony under-corrected) vs choroid plexus / stress (organoid-only biology). Based on verdict, author remediation notebook.
+
+### Notebooks authored / run
+- `colab_09_cluster0_annotation.ipynb` — authored and pushed. Focused diagnostic: 5 sections (load + locate, top differential markers, targeted lineage panels, quantitative scores, decision). GitHub commits: `9e0f22c` (authored), `92b8a85` (add 1d), `01e7bfc` (mirror markdown from _WITH_OUTPUT).
+- `colab_08b_integration_intersect_hvg.ipynb` — authored and pushed (`9ea6c4b`). Remediation: restrict HVGs to intersection of both batches (ca. 751 genes). Section 11 re-runs cluster-0 fetal-RG check on new clustering.
+
+### colab_09 execution results
+
+**1b:** Cluster 0 — 23,737 cells total. bhaduri_2020: 23,439 (98.7%) = 23.4% of all 2020. bhaduri_2021: 298 (1.3%) = 0.3% of all 2021.
+
+**1c (UMAP):** Cluster 0 is a single dense contiguous blob in the lower-center / lower-right of the UMAP — exactly the cortical RG / cycling progenitor zone (PAX6⁺ SOX2⁺ MKI67⁺ from colab_08 9c). Sharp left boundary. A handful of scattered cluster-0 cells visible elsewhere (likely the 298 fetal cells).
+
+**1d — bonus check (discovered mid-session):** `obs` columns survived `ad.concat`'s outer join with NaN-fill — `cell_type_coarse`, `age_gw`, `donor`, `area_ucsc` etc. all present (NaN for the dataset that doesn't have them). This enabled a direct UCSC-label cross-tab on the 298 fetal cells in cluster 0.
+
+| cell_type_coarse | cluster 0 fetal fraction | baseline 2021 fraction | enrichment ratio |
+|---|---|---|---|
+| RG | 0.748 | 0.112 | **6.66×** |
+| Dividing | 0.181 | 0.093 | 1.95× |
+| Neuron | 0.017 | 0.524 | 0.03× |
+| Interneuron | 0.000 | 0.174 | 0.00× |
+
+**Verdict: cluster 0 is shared cortical RG. Harmony under-corrected.**
+
+Arithmetic: ca. 11,200 fetal RG total in 2021 subsample. Only ca. 223 made it into cluster 0. The other ca. 10,977 fetal RG embedded as separate (mostly-fetal) clusters on the UMAP.
+
+**§5a auto-classifier gave wrong verdict ("Choroid plexus")** — artifact of `panel_mean` averaging raw log-normalized values without per-gene z-scoring. CP panel (KRT18, OTX2 — broadly expressed at high baseline) dominated the mean. Actual top-5 markers: VIM, TPI1, ENO1, RPS2, RPL41 — cycling RG signature (VIM = RG intermediate filament; TPI1/ENO1 = glycolytic enzymes, organoid-typical hypoxia/Warburg; RPS2/RPL41 = ribosomal, proliferating cells). TTR (gold-standard CP marker) not in top 30. Trust 1d, not §5a. Panel_mean approach should not be reused as a decision rule.
+
+**Fixes applied to colab_09 empty notebook:** added two markdown cells from _WITH_OUTPUT — (1) callout after 1d ("no need to run rest, Harmony under-corrected"), (2) §5a caveat at end documenting the panel_mean artifact.
+
+### colab_08b design
+- Identical to colab_08 except §5b: after `sc.pp.highly_variable_genes(..., batch_key='dataset')`, filter `adata.var['highly_variable']` to `highly_variable_nbatches == 2` only (ca. 751 genes vs colab_08's 2,000-gene union).
+- Output: `integrated_100k_harmony_intersectHVG.h5ad` (separate from colab_08's output, both kept).
+- New §11: re-runs 1d-style diagnostic — finds dominant RG cluster by mean PAX6/SOX2/MKI67/VIM/NES/FABP7 score, cross-tabs fetal `cell_type_coarse`, prints pass/partial/fail verdict vs colab_08.
+- **Pass criterion**: fetal cell count in dominant RG cluster ≳ several thousand (vs colab_08's 298); RG enrichment ratio still ≳ 5×; cells in >95%-pure clusters drops substantially below 41%.
+- **Escalation path if fail**: Harmony `theta` bump (default 2 → 4–6) → scVI.
+
+### GitHub commits this session
+- `9e0f22c` — colab_09: authored
+- `92b8a85` — colab_09: add 1d (direct fetal-side cell_type_coarse check)
+- `9ea6c4b` — colab_08b: authored (intersection-only HVGs remediation)
+- `01e7bfc` — colab_09: mirror two markdown cells from _WITH_OUTPUT
+
+### Next session (colab_08b)
+1. Pull on Colab (standard RAM sufficient — read-only load of 5.54 GB h5ad, no fresh scale).
+2. Run end-to-end. Section 11 prints verdict automatically.
+3. If pass → proceed to colab_10 (full 21-cluster annotation) on `integrated_100k_harmony_intersectHVG.h5ad`.
+4. If partial/fail → bump Harmony theta or switch to scVI.
