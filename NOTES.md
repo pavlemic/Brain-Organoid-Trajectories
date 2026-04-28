@@ -1273,3 +1273,62 @@ Arithmetic: ca. 11,200 fetal RG total in 2021 subsample. Only ca. 223 made it in
 2. Run end-to-end. Section 11 prints verdict automatically.
 3. If pass → proceed to colab_10 (full 21-cluster annotation) on `integrated_100k_harmony_intersectHVG.h5ad`.
 4. If partial/fail → bump Harmony theta or switch to scVI.
+
+### Session 22 update — colab_08b ran (failed), colab_08c authored (not yet run)
+
+**colab_08b execution (Colab high-RAM):**
+
+- Pipeline 1a–5a identical to colab_08 (verified at every checkpoint).
+- §5b: union HVGs = 2,000, intersection HVGs = 751 (matches colab_08's known intersection count).
+- §6a PCA on 751 HVGs: PC1=4.19% (vs colab_08's 3.23%), cumulative PC30=22.5% (vs 16.3%). Higher per-PC variance — fewer genes concentrate variance into fewer dimensions.
+- §7a Harmony: **converged in 1 iteration** (vs colab_08's 2). theta=2 default.
+- §7b shift diagnostic: mean abs shift per cell = **0.127** (vs colab_08's 0.626 — ca. 5× less per-cell work). Std=0.229, max=2.64.
+- §9a UMAP by dataset: **clear top/bottom batch separation** — `bhaduri_2020` dominates upper half, `bhaduri_2021` dominates lower. Worse than colab_08's 9a, which had intermixing in the central body.
+
+**colab_08b §11 RG-remediation results — failed:**
+
+| Metric | colab_08 | colab_08b |
+|---|---|---|
+| HVGs | 2,000 (union) | 751 (intersection) |
+| Harmony iterations | 2 | 1 |
+| Mean abs per-cell shift | 0.626 | 0.127 |
+| Cumulative PC30 variance | 16.3% | 22.5% |
+| Leiden clusters at res=0.5 | 21 | 19 |
+| Cells in >95%-pure clusters | ca. 41% | **ca. 61%** |
+| Dominant RG cluster | 0 | 5 |
+| Dominant RG composition (2020 / 2021) | 23,439 / 298 (98.7% **2020**) | 1,969 / 13,401 (87.2% **2021**) |
+| Fetal RG enrichment in dominant cluster | 6.66× | 6.69× |
+
+**Verdict: colab_08b made the integration worse.** Same problem, rotated 90°. In colab_08, organoid RG consolidated into cluster 0 and fetal RG scattered (only 298 of ca. 11,200 made it). In colab_08b, **fetal RG consolidated** into cluster 5 (ca. 10,078 of ca. 11,200 fetal RG = 90% recovery on fetal side), but **organoid RG fragmented** across clusters 0/1/8/12 (mean RG-marker scores 0.87–0.93, vs cluster 5's 1.66). Cluster 5 = 87.2% fetal-pure.
+
+**Why it backfired:** the 1,249 dropped HVGs (HV in only one dataset) were not pure noise — they included shared biological signal whose variance pattern differed between datasets due to cell-type composition asymmetry (e.g. genes that vary across organoid stress states are HV in 2020 only because 2020 has more stress diversity, but they're still informative cell-type markers). Removing them stripped variance Harmony was using to find shared cell-type structure. The 751 surviving genes ended up encoding dataset-level technical signal (sequencing depth, capture efficiency, library complexity), making the batch axis dominant in the input PCA where Harmony couldn't reach. Visible in 9a's clear top/bottom segregation and the 1-iteration / 0.127-shift collapse — Harmony correctly identified that there was little continuous batch-axis to remove, but the batch effect was already baked into the discrete cluster structure of the input.
+
+**colab_08c authored (NOT yet run):**
+
+- File: `notebooks/colab/colab_08c_integration_theta4.ipynb`. Commit: `82df321`.
+- Strategy: **revert to colab_08's 2,000 union HVGs, bump Harmony `theta` from default 2 → 4**. Single-parameter change on the original feature space. Cheapest test of "Harmony just needs more aggressive force, not different inputs."
+- Output: `integrated_100k_harmony_theta4.h5ad` (kept alongside colab_08 and colab_08b outputs).
+- §11 diagnostic copied verbatim from colab_08b.
+- **Pass criterion**: dominant RG cluster has substantial mixing (neither >95% organoid nor >95% fetal); fetal RG enrichment ≳ 5×; pure-cluster fraction drops below 41%.
+- **Expected diagnostic signals if working**: more iterations to converge (5–10+ vs colab_08's 2), mean per-cell shift > 0.626.
+
+**Annotated `_WITH_OUTPUT` notebooks added this session (in `outputs_local/`):**
+- `colab_09_cluster0_annotation_WITH_OUTPUT.ipynb` — 4 Finding cells in §1 + §5a-caveat at end (43 cells).
+- `colab_08b_integration_intersect_hvg_WITH_OUTPUT.ipynb` — top failure-warning blockquote + bottom final-summary table (61 cells).
+
+**Files saved to Drive this session:**
+- `integrated_100k_harmony_intersectHVG.h5ad` — kept for reference, but read-only / won't be used downstream.
+
+**GitHub commits this session (cumulative):**
+- `9e0f22c` colab_09 authored
+- `92b8a85` colab_09: add 1d (cell_type_coarse cross-tab)
+- `9ea6c4b` colab_08b authored
+- `01e7bfc` colab_09: mirror two markdown cells from _WITH_OUTPUT
+- `90e6956` NOTES Session 22 (initial entry)
+- `82df321` colab_08c authored
+
+**Next session (colab_08c):**
+1. Pull on Colab high-RAM.
+2. Run colab_08c end-to-end. §11 prints verdict automatically.
+3. **If pass** → proceed to colab_10 (full 21-cluster annotation) on `integrated_100k_harmony_theta4.h5ad`.
+4. **If still fails** → escalate to `theta=6`, then scVI (raw counts recoverable from `bhaduri_2020_clustered.h5ad`'s `.raw`), then BBKNN as fallback.
