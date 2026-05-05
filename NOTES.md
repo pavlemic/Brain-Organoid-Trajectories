@@ -1332,3 +1332,52 @@ Arithmetic: ca. 11,200 fetal RG total in 2021 subsample. Only ca. 223 made it in
 2. Run colab_08c end-to-end. §11 prints verdict automatically.
 3. **If pass** → proceed to colab_10 (full 21-cluster annotation) on `integrated_100k_harmony_theta4.h5ad`.
 4. **If still fails** → escalate to `theta=6`, then scVI (raw counts recoverable from `bhaduri_2020_clustered.h5ad`'s `.raw`), then BBKNN as fallback.
+
+### Session 23 — colab_08c ran (failed), scVI abandoned, pivot to scanorama
+
+**colab_08c execution results (Harmony theta=4, union HVGs):**
+
+- Converged in **5 iterations** (vs colab_08's 2, colab_08b's 1). theta=4 made Harmony work harder.
+- §7b mean abs per-cell shift = **0.420** (between colab_08's 0.626 and colab_08b's 0.127 — more iterations but smaller per-cell shifts than colab_08).
+- §9a UMAP-by-dataset: no top/bottom band segregation (unlike colab_08b). Substantial intermixing visible. Best visual of the three Harmony runs.
+- §11 verdict — **FAILED**:
+
+| Metric | colab_08 | colab_08b | colab_08c |
+|---|---|---|---|
+| HVGs | 2,000 union | 751 intersect | 2,000 union |
+| Harmony iterations | 2 | 1 | 5 |
+| Mean shift | 0.626 | 0.127 | 0.420 |
+| >95%-pure cluster fraction | ca. 41% | ca. 61% | **41%** |
+| Dominant RG cluster | 0 (98.7% organoid) | 5 (87.2% fetal) | 13 (99.5% fetal) |
+| Fetal RG enrichment | 6.66× | 6.69× | **4.53×** (below 5× threshold) |
+
+Three Harmony attempts, same failure, three rotations. Pattern: Harmony produces one high-purity RG cluster, but which side dominates rotates each run. Pure-cluster fraction never dropped. **Conclusion: Harmony cannot bridge this cross-protocol gap regardless of theta.**
+
+**scVI escalation plan — abandoned:**
+
+Planned to escalate to scVI (requires raw integer counts). Authored `colab_07b_bhaduri2020_recount.ipynb` to re-parse the original GEO matrix (`GSE132672_allorganoids_withnew_matrix.txt.gz`, still on Drive) and rebuild a raw-count 100k file.
+
+§1b hard-stop fired:
+- `.X.data` min nonzero = **0.21**, max = **711,374.6**, first 10 values = 1.77, 19.04, 8.45, 42.37... (non-integer decimals, inconsistent with raw UMI counts).
+- Row sums per cell: min 0.0, median 63,517, max 8,058,962, std 152,929 — **wildly variable, no fixed normalization target**.
+- Diagnosis: the GEO file is likely **cellranger-aggr library-size-normalized output** (`--normalize=mapped`), which scales each library's counts by a per-library factor. This produces exactly this signature: roughly count-magnitude per cell but non-integer. The raw counts no longer exist in this file.
+- colab_00's label "raw UMI counts" for this file was wrong from the start. All downstream normalization (colab_01's `normalize_total + log1p`) was applied on top of already-normalized data — the existing 100k files are double-normalized.
+
+**Implications:**
+1. Raw counts for Bhaduri 2020 are not recoverable without re-running cellranger from SRA fastq (multi-day compute). scVI is off the table.
+2. The double-normalization doesn't invalidate existing Harmony results or marker analyses — cellranger-aggr's scaling is linear (within-cell gene ratios preserved), and `normalize_total + log1p` on top re-equalizes per-cell totals. Signal (high vs low expression per gene per cell type) is intact.
+3. Biological content of Bhaduri 2020 is confirmed valid — sample structure (37 samples, 3 protocols, protocol × age_week grid), marker patterns (SOX2/PAX6/EOMES etc. in correct clusters), and cell count (~242k) all match the paper and are biologically coherent.
+
+**Pivot: scanorama.** Works on log-normalized data (what we have). Mutual-nearest-neighbor panoramic alignment (Hie et al. 2019, Nature Biotech). No GPU, no raw counts, same existing 100k files as input. Will use same §11 RG diagnostic for direct comparison with Harmony results.
+
+**colab_07b status:** authored (`db49407`, `bee2801`), partially run (§0a-§1a only), defunct as a raw-count rebuild but kept in repo for its diagnostic value (confirmed GEO file format, documented dead end).
+
+**GitHub commits this session:**
+- `db49407` colab_07b: authored
+- `bee2801` colab_07b: replace tildes with ca.
+
+**Next session (colab_08d):**
+1. Author `colab_08d_integration_scanorama.ipynb` on existing 100k files.
+2. Run on Colab standard RAM (no GPU needed, ca. 10 min).
+3. §11 verdict: same pass criteria as Harmony runs (dominant RG cluster mixed, fetal RG enrichment ≳ 5×, pure-cluster fraction below 41%).
+4. If scanorama fails → accept asymmetry as biological and proceed to colab_10 (annotation) on colab_08's output, with the understanding that cross-dataset RG trajectory analysis will be within-organoid only.
