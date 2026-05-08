@@ -1381,3 +1381,5 @@ Planned to escalate to scVI (requires raw integer counts). Authored `colab_07b_b
 2. Run on Colab standard RAM (no GPU needed, ca. 10 min).
 3. §11 verdict: same pass criteria as Harmony runs (dominant RG cluster mixed, fetal RG enrichment ≳ 5×, pure-cluster fraction below 41%).
 4. If scanorama fails → accept asymmetry as biological and proceed to colab_10 (annotation) on colab_08's output, with the understanding that cross-dataset RG trajectory analysis will be within-organoid only.
+
+(2026-05-08 nudge: NOTES is behind actual repo state — colab_08d, colab_10, colab_12 already authored on main; full Session 24 writeup deferred.)
