@@ -36,3 +36,11 @@ Thumbs.db
 # IDE
 .vscode/settings.json
 .idea/
+
+# Personal working log
+What we did.txt
+
+# Output notebooks kept local-only (Zhong-arc superseded by Bhaduri 2021 integration)
+outputs_local/colab_03_*
+outputs_local/colab_04_*
+outputs_local/colab_05_*

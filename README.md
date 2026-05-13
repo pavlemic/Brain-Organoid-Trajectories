@@ -81,7 +81,7 @@ Three-phase pattern, applied per session:
 
 1. **Authoring** — committed to GitHub in `notebooks/colab/`. Code cells with cell-ID headers (`### 6a — ...`), short pre-cell explanations, no output, no findings.
 2. **Run on Colab** — execute with Drive mounted. Outputs generated.
-3. **`_WITH_OUTPUT` archive** — download the run notebook into `outputs_local/`. Interpretive markdown cells added after each code cell with observed results. Kept locally and gitignored — these files are the canonical session record.
+3. **`_WITH_OUTPUT` archive** — download the run notebook into `outputs_local/`. Interpretive markdown cells added after each code cell with observed results. Output notebooks for the pipeline and benchmark steps are tracked in this repo; the superseded Zhong-arc outputs remain local-only.
 
 ## Project structure
 
@@ -90,7 +90,7 @@ brain-organoid-trajectories/
 ├── data/                          <- not tracked (lives on Drive)
 ├── notebooks/
 │   └── colab/                     <- Colab pipeline (14 notebooks)
-├── outputs_local/                 <- run-output notebooks + plots (gitignored)
+├── outputs_local/                 <- run-output notebooks + plots (pipeline + benchmark tracked; Zhong-arc local-only)
 ├── src/                           <- reusable scanpy modules
 ├── NOTES.md                       <- session-by-session log
 ├── requirements.txt
