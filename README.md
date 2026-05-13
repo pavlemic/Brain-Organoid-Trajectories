@@ -1,8 +1,8 @@
 # Brain Organoid Trajectories
 
-A learning project exploring single-cell RNA-seq analysis on human cortical-development data. Two large public datasets (Bhaduri 2020 organoids and Bhaduri 2021 fetal cortex), a scanpy pipeline from raw-matrix download through QC, clustering, and batch integration.
+End-to-end single-cell RNA-seq pipeline on human cortical-development data, applied to ~640k cells from two public datasets (Bhaduri 2020 organoids, Bhaduri 2021 fetal cortex) — scanpy from raw-matrix download through QC, clustering, and a four-configuration batch-integration benchmark.
 
-The original goal was a side-by-side comparison of transcriptional maturation trajectories between brain organoids and the fetal cortex. That cross-protocol comparison was not achieved — the batch-integration step could not bridge the organoid-vs-primary-tissue gap to a level supporting reliable joint trajectory inference, across four method/parameter configurations. The integration comparison itself is the most substantive analytical exercise here and is documented quantitatively below.
+The headline analytical result is the integration benchmark. Four method/parameter configurations (three Harmony, one scanorama) produced the same characteristic failure mode on organoid-vs-primary-tissue integration despite same-lab, same-chemistry origins — one high-purity radial-glia cluster per run, with the dominant side rotating across configurations. The original motivation was a cross-protocol trajectory comparison; that depends on integration succeeding and so was not pursued, and the integration finding is itself the main analytical takeaway.
 
 ## Status
 
