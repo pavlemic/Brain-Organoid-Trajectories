@@ -21,6 +21,10 @@ The original goal was a side-by-side comparison of transcriptional maturation tr
 
 Goal: produce a joint embedding of 100k organoid + 100k fetal cells where shared cell types (radial glia in particular) co-cluster across datasets.
 
+![Harmony-default joint UMAP colored by dataset — the two datasets occupy visibly distinct territories instead of mixing](figures/umap_by_dataset.png)
+
+*Joint UMAP after Harmony (default config, `colab_08`), colored by dataset. Successful integration would show the two colors intermixed within each cell-type region; what's visible instead is dataset-segregated territories.*
+
 | Notebook | Method | Configuration | Cells in >95%-pure clusters | Dominant RG cluster | Fetal RG enrichment |
 |---|---|---|---|---|---|
 | colab_08  | Harmony   | 2,000 union HVGs, theta=2 (default) | ca. 41% | 0  (98.7% organoid) | 6.66x |
@@ -29,6 +33,16 @@ Goal: produce a joint embedding of 100k organoid + 100k fetal cells where shared
 | colab_08d | scanorama | 2,000 union HVGs, dimred=30         | ca. 69% | 14 (99.98% fetal)   | 4.33x |
 
 Same failure mode rotated four ways: each run produces one high-purity radial-glia cluster, but which side dominates rotates between configurations, and the share of cells in >95%-pure clusters never drops to a level supporting cross-dataset trajectory inference. scVI was the planned escalation but is unavailable here — `colab_07b` verified that the GEO-archived Bhaduri 2020 expression matrix is `cellranger aggr --normalize=mapped` output (library-size-normalized, non-integer values), not raw counts, so scVI's count-likelihood model cannot be applied without re-running cellranger from SRA fastqs.
+
+![Lineage marker genes on the integrated UMAP — SOX2, PAX6, EOMES, TBR1, NEUROD2, GAD1, GAD2, GFAP, MKI67](figures/umap_lineage_marker_genes.png)
+
+*Lineage markers on the same integrated embedding (`colab_08`). The biological structure is intact — radial-glia, IPC, excitatory and interneuron territories are recognizable — so the integration failure isn't from loss of signal, it's from the dataset axis dominating over the biological axis.*
+
+### Cluster-level diagnostic
+
+![UMAP with cluster 0 highlighted — a high-purity cluster sitting on the organoid side of the embedding](figures/cluster0_highlight.png)
+
+*Cluster 0 highlighted on the joint UMAP (`colab_09`). 98.7% of its cells come from Bhaduri 2020 (organoids). This is the "dominant RG cluster" cited in the table for the Harmony-default run — a radial-glia subtype where Harmony failed to bridge the protocol gap, so the cluster ends up almost entirely from one side.*
 
 The result is consistent with reports that organoid-vs-primary-tissue integration is unusually hard despite same-lab / same-chemistry origins. Documented here as a case study with quantitative diagnostics.
 
@@ -40,6 +54,24 @@ The result is consistent with reports that organoid-vs-primary-tissue integratio
 | **Bhaduri et al. 2021** | Fetal cortex atlas (GW14–25, 11 donors) | NeMO archive (cortical subset) | 396,186 |
 
 Same lab, same 10x Chromium v2 chemistry. The Bhaduri 2021 download required parsing three different NeMO URL conventions, merging split-lane samples per UCSC sample, and joining against the UCSC `dev-brain-regions` cell metadata for cell-type labels — see `colab_06`.
+
+![Bhaduri 2020 organoid UMAP colored by cell-type marker genes](figures/bhaduri_UMAP_cell_type_markers.png)
+
+*Per-dataset UMAP for Bhaduri 2020 organoids (`colab_02`), with cell-type marker genes overlaid. Each dataset on its own produces a coherent embedding with the expected lineage structure; the difficulty arises only at the joint integration step.*
+
+### Why Bhaduri 2021 over Zhong 2018?
+
+The first fetal partner attempted in this project was Zhong et al. 2018 (`colab_03/04/05_zhong2018`). It was abandoned in favor of Bhaduri 2021 for two reasons visible in the pre-integration UMAP: a heavy cell-count imbalance (Zhong is ca. 100× smaller than the organoid dataset) and a cell-type composition mismatch that left only a thin overlap of shared types for any joint embedding to anchor on.
+
+![Pre-Harmony UMAP of Bhaduri 2020 + Zhong 2018, colored by dataset](figures/pre_harmony_umap_by_dataset.png)
+
+*Pre-Harmony UMAP of the two datasets concatenated. The Zhong sample (one color) is a small ribbon next to the much larger Bhaduri 2020 cloud — a size imbalance Harmony cannot fix.*
+
+![Pre-Harmony UMAP of Bhaduri 2020 + Zhong 2018, colored by cell type](figures/pre_harmony_umap_by_celltype.png)
+
+*Same pre-Harmony UMAP, colored by cell type. The two datasets occupy non-overlapping regions of the embedding even where they share cell-type labels — the joint biology Harmony needs to learn from is mostly missing.*
+
+Bhaduri 2021 (same lab, same chemistry, balanced cell-count) was substituted as the fetal partner from `colab_06` onward.
 
 ## What's in the repo
 
