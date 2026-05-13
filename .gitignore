@@ -41,6 +41,9 @@ Thumbs.db
 What we did.txt
 
 # Output notebooks kept local-only (Zhong-arc superseded by Bhaduri 2021 integration)
-outputs_local/colab_03_*
-outputs_local/colab_04_*
-outputs_local/colab_05_*
+outputs/colab_03_*
+outputs/colab_04_*
+outputs/colab_05_*
+
+# PLOT directories — large PNGs, embedded in the WITH_OUTPUT notebooks already
+outputs/*_PLOTS/
