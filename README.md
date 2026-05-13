@@ -1,6 +1,6 @@
 # Brain Organoid Trajectories
 
-A learning project exploring single-cell RNA-seq analysis on human cortical-development data. Two large public datasets (Bhaduri 2020 organoids and Bhaduri 2021 fetal cortex), a scanpy pipeline from raw-matrix download through QC, clustering, batch integration, and an RNA velocity demo.
+A learning project exploring single-cell RNA-seq analysis on human cortical-development data. Two large public datasets (Bhaduri 2020 organoids and Bhaduri 2021 fetal cortex), a scanpy pipeline from raw-matrix download through QC, clustering, and batch integration.
 
 The original goal was a side-by-side comparison of transcriptional maturation trajectories between brain organoids and the fetal cortex. That cross-protocol comparison was not achieved — the batch-integration step could not bridge the organoid-vs-primary-tissue gap to a level supporting reliable joint trajectory inference, across four method/parameter configurations. The integration comparison itself is the most substantive analytical exercise here and is documented quantitatively below.
 
@@ -12,11 +12,10 @@ The original goal was a side-by-side comparison of transcriptional maturation tr
 | 2. Data download (Bhaduri 2021 fetal, NeMO archive) | done — 396k cells |
 | 3. Per-dataset QC / normalization / HVG / PCA / UMAP / Leiden | done on both datasets |
 | 4. Stratified balanced subsample (100k + 100k) | done |
-| 5. Batch integration | done; four configurations compared, none cleanly bridged the gap (table below) |
-| 6. Cell-type annotation on integrated object | authored (`colab_10`), not run |
-| 7. Trajectory inference (PAGA + DPT) | diagnostic only — failure modes documented in `colab_05` (Session 15) |
-| 8. RNA velocity | scVelo demo (`colab_12`) on a public dataset that ships with spliced/unspliced layers |
-| 9. Cross-dataset trajectory comparison | not pursued — depends on (5) and (7) succeeding |
+| 5. Batch integration | done; four configurations benchmarked, consistent failure mode (table below) |
+| 6. Cell-type annotation on integrated object | not pursued — depends on (5) succeeding |
+| 7. Trajectory inference (PAGA + DPT) | diagnostic only — failure modes documented in `colab_05_trajectory_zhong2018` (Session 15) |
+| 8. Cross-dataset trajectory comparison | not pursued — depends on (5) and (7) succeeding |
 
 ## Integration method comparison
 
@@ -52,21 +51,14 @@ Same lab, same 10x Chromium v2 chemistry. The Bhaduri 2021 download required par
 
 ### Notebooks
 
-Local (small-scale, on the pbmc3k test dataset):
-
-- `notebooks/01_preprocessing.ipynb`
-- `notebooks/02_umap_clustering.ipynb`
-
-Colab (full datasets):
-
 | Notebook | Purpose |
 |---|---|
 | `colab_00_data_download` | Bhaduri 2020 GEO download + h5ad save |
 | `colab_01_preprocessing` | QC, normalization, HVG, PCA on both datasets |
 | `colab_02_umap_clustering` | Per-dataset UMAP, Leiden, marker genes |
-| `colab_03_integration` | First integration attempt (Bhaduri 2020 + Zhong 2018) |
-| `colab_04_cell_type_annotation` | Annotation of the 19-cluster integrated object |
-| `colab_05_trajectory` | PAGA + DPT — documented diagnostic failure modes |
+| `colab_03_integration_zhong2018` | First integration attempt (Bhaduri 2020 + Zhong 2018 fetal partner, later superseded) |
+| `colab_04_annotation_zhong2018` | Annotation of the 19-cluster Zhong-based integrated object |
+| `colab_05_trajectory_zhong2018` | PAGA + DPT on the Zhong-based object — documented diagnostic failure modes |
 | `colab_06_bhaduri2021_download` | NeMO download with 3 URL conventions, 396k cells |
 | `colab_07_stratified_subsample` | Largest-remainder stratified 100k subsample |
 | `colab_07b_bhaduri2020_recount` | Verified GEO matrix is normalized, not raw |
@@ -75,12 +67,10 @@ Colab (full datasets):
 | `colab_08c_integration_theta4` | Harmony, theta=4 |
 | `colab_08d_integration_scanorama` | scanorama panorama integration |
 | `colab_09_cluster0_annotation` | Targeted diagnostic on cluster 0 (98.7% organoid) |
-| `colab_10_cell_type_annotation` | Annotation scaffold for the 21-cluster integrated object |
-| `colab_12_rna_velocity_demo` | scVelo end-to-end on the dentate gyrus tutorial dataset |
 
 ### Compute split
 
-- **Local (laptop):** code authoring, `src/` modules, small test runs on pbmc3k.
+- **Local (laptop):** code authoring and `src/` modules.
 - **Google Colab (paid):** all heavy compute on real datasets.
 - **Google Drive:** all `.h5ad` files (multi-GB each); never on GitHub.
 - **GitHub:** code, empty Colab notebooks, and the session log only.
@@ -99,12 +89,9 @@ Three-phase pattern, applied per session:
 brain-organoid-trajectories/
 ├── data/                          <- not tracked (lives on Drive)
 ├── notebooks/
-│   ├── 01_preprocessing.ipynb     <- local pbmc3k walkthroughs
-│   ├── 02_umap_clustering.ipynb
-│   └── colab/                     <- Colab pipeline (16 notebooks)
+│   └── colab/                     <- Colab pipeline (14 notebooks)
 ├── outputs_local/                 <- run-output notebooks + plots (gitignored)
 ├── src/                           <- reusable scanpy modules
-├── results/figures/               <- saved plots
 ├── NOTES.md                       <- session-by-session log
 ├── requirements.txt
 └── README.md
@@ -113,7 +100,7 @@ brain-organoid-trajectories/
 ## Reproducing
 
 ```bash
-# Local environment for src/ + local notebooks
+# Local environment for src/ modules
 python -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
