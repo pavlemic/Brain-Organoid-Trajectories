@@ -87,7 +87,6 @@ Three-phase pattern, applied per session:
 
 ```
 brain-organoid-trajectories/
-├── data/                          <- not tracked (lives on Drive)
 ├── notebooks/
 │   └── colab/                     <- Colab pipeline (14 notebooks)
 ├── outputs/                       <- run-output notebooks (pipeline + benchmark tracked; Zhong-arc local-only)
@@ -96,6 +95,8 @@ brain-organoid-trajectories/
 ├── requirements.txt
 └── README.md
 ```
+
+Data is not tracked — `.h5ad` files live on Google Drive at `/content/drive/MyDrive/brain-organoid-trajectories/data/`.
 
 ## Reproducing
 
