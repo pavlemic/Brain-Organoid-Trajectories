@@ -13,9 +13,9 @@ The headline analytical result is the integration benchmark. Four method/paramet
 | 3. Per-dataset QC / normalization / HVG / PCA / UMAP / Leiden | done on both datasets |
 | 4. Stratified balanced subsample (100k + 100k) | done |
 | 5. Batch integration | done; four configurations benchmarked, consistent failure mode (table below) |
-| 6. Cell-type annotation on integrated object | not pursued — depends on (5) succeeding |
+| 6. Cell-type annotation on integrated object | out of scope — the integration result (5) is the project's finding; annotating a non-integrated joint object wasn't meaningful |
 | 7. Trajectory inference (PAGA + DPT) | diagnostic only — failure modes documented in `colab_05_trajectory_zhong2018` (Session 15) |
-| 8. Cross-dataset trajectory comparison | not pursued — depends on (5) and (7) succeeding |
+| 8. Cross-dataset trajectory comparison | out of scope — superseded as the project's goal by the integration-benchmark finding above |
 
 ## Integration method comparison
 
